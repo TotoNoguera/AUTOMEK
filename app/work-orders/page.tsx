@@ -13,6 +13,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
 import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
+import { QuickAddVehicle, type QuickVehicle } from "@/components/common/QuickAddVehicle";
 
 interface WorkOrder {
   id: string;
@@ -125,6 +126,13 @@ export default function WorkOrdersPage() {
   }
 
   const selectedClient = clients.find((c) => c.id === selectedClientId);
+
+  function handleVehicleCreated(vehicle: QuickVehicle) {
+    setClients((prev) =>
+      prev.map((c) => (c.id === selectedClientId ? { ...c, vehicles: [...c.vehicles, vehicle] } : c))
+    );
+    setSelectedVehicleId(vehicle.id);
+  }
   const total = items.reduce(
     (sum, item) => sum + item.cantidad * item.precioUnitario,
     0
@@ -216,6 +224,8 @@ export default function WorkOrdersPage() {
               ))}
             </Select>
           </div>
+
+          {selectedClientId && <QuickAddVehicle clientId={selectedClientId} onCreated={handleVehicleCreated} />}
 
           <div className="grid grid-cols-2 gap-4">
             <Input

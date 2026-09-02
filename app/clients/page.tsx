@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Users, Eye, Trash2 } from "lucide-react";
+import { Plus, Search, Users, Eye, Trash2, Car } from "lucide-react";
 import { useToast } from "@/components/common/ToastProvider";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -12,6 +12,9 @@ import { Input, Label } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
 import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
+
+const currentYear = new Date().getFullYear();
+const emptyVehicleForm = { patente: "", marca: "", modelo: "", anio: currentYear, kilometraje: "" };
 
 interface Client {
   id: string;
@@ -34,6 +37,9 @@ export default function ClientsPage() {
     telefono: "",
     direccion: "",
   });
+  const [addVehicleNow, setAddVehicleNow] = useState(false);
+  const [vehicleFormData, setVehicleFormData] = useState(emptyVehicleForm);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     loadClients();
@@ -57,8 +63,15 @@ export default function ClientsPage() {
     }
   }
 
+  function resetForm() {
+    setFormData({ nombre: "", email: "", telefono: "", direccion: "" });
+    setAddVehicleNow(false);
+    setVehicleFormData(emptyVehicleForm);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setSubmitting(true);
     try {
       const response = await fetch("/api/clients", {
         method: "POST",
@@ -71,17 +84,49 @@ export default function ClientsPage() {
         }),
       });
 
-      if (response.ok) {
-        setFormData({ nombre: "", email: "", telefono: "", direccion: "" });
-        setShowForm(false);
-        showToast("Cliente creado correctamente", "success");
-        loadClients();
-      } else {
+      if (!response.ok) {
         const error = await response.json();
         showToast(`Error: ${error.error}`, "error");
+        return;
       }
+
+      const client = await response.json();
+
+      if (addVehicleNow) {
+        const vehicleResponse = await fetch("/api/vehicles", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clientId: client.id,
+            patente: vehicleFormData.patente.toUpperCase(),
+            marca: vehicleFormData.marca,
+            modelo: vehicleFormData.modelo,
+            anio: Number(vehicleFormData.anio),
+            kilometraje: vehicleFormData.kilometraje ? Number(vehicleFormData.kilometraje) : undefined,
+          }),
+        });
+
+        if (!vehicleResponse.ok) {
+          const error = await vehicleResponse.json();
+          showToast(`Cliente creado, pero el vehículo no pudo cargarse: ${error.error}`, "error");
+          resetForm();
+          setShowForm(false);
+          loadClients();
+          return;
+        }
+
+        showToast("Cliente y vehículo creados correctamente", "success");
+      } else {
+        showToast("Cliente creado correctamente", "success");
+      }
+
+      resetForm();
+      setShowForm(false);
+      loadClients();
     } catch (error) {
       showToast("Error creando cliente", "error");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -155,11 +200,89 @@ export default function ClientsPage() {
               onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
             />
           </div>
+
+          <label className="flex cursor-pointer items-center gap-2 border-t border-carbon-700 pt-4 text-sm text-carbon-200">
+            <input
+              type="checkbox"
+              checked={addVehicleNow}
+              onChange={(e) => setAddVehicleNow(e.target.checked)}
+              className="h-4 w-4 rounded border-carbon-600 bg-carbon-900 accent-brand-500"
+            />
+            <Car className="h-4 w-4 text-brand-400" />
+            Agregar vehículo ahora
+          </label>
+
+          {addVehicleNow && (
+            <div className="space-y-4 rounded-lg border border-carbon-700 bg-carbon-900/40 p-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="v-patente">Patente *</Label>
+                  <Input
+                    id="v-patente"
+                    type="text"
+                    value={vehicleFormData.patente}
+                    onChange={(e) => setVehicleFormData({ ...vehicleFormData, patente: e.target.value })}
+                    className="uppercase"
+                    required={addVehicleNow}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="v-anio">Año *</Label>
+                  <Input
+                    id="v-anio"
+                    type="number"
+                    value={vehicleFormData.anio}
+                    onChange={(e) => setVehicleFormData({ ...vehicleFormData, anio: Number(e.target.value) })}
+                    required={addVehicleNow}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="v-marca">Marca *</Label>
+                  <Input
+                    id="v-marca"
+                    type="text"
+                    value={vehicleFormData.marca}
+                    onChange={(e) => setVehicleFormData({ ...vehicleFormData, marca: e.target.value })}
+                    required={addVehicleNow}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="v-modelo">Modelo *</Label>
+                  <Input
+                    id="v-modelo"
+                    type="text"
+                    value={vehicleFormData.modelo}
+                    onChange={(e) => setVehicleFormData({ ...vehicleFormData, modelo: e.target.value })}
+                    required={addVehicleNow}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="v-km">Kilometraje</Label>
+                <Input
+                  id="v-km"
+                  type="number"
+                  value={vehicleFormData.kilometraje}
+                  onChange={(e) => setVehicleFormData({ ...vehicleFormData, kilometraje: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setShowForm(false);
+                resetForm();
+              }}
+            >
               Cancelar
             </Button>
-            <Button type="submit">Crear Cliente</Button>
+            <Button type="submit" loading={submitting}>
+              {addVehicleNow ? "Crear Cliente y Vehículo" : "Crear Cliente"}
+            </Button>
           </div>
         </form>
       </Modal>

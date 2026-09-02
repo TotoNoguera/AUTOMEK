@@ -15,6 +15,7 @@ import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { cn } from "@/lib/utils";
 import { buildWhatsAppLink, whatsAppConfirmTurno } from "@/lib/whatsapp";
+import { QuickAddVehicle, type QuickVehicle } from "@/components/common/QuickAddVehicle";
 
 interface Schedule {
   id: string;
@@ -159,6 +160,13 @@ export default function SchedulesPage() {
   }
 
   const selectedClient = clients.find((c) => c.id === selectedClientId);
+
+  function handleVehicleCreated(vehicle: QuickVehicle) {
+    setClients((prev) =>
+      prev.map((c) => (c.id === selectedClientId ? { ...c, vehicles: [...c.vehicles, vehicle] } : c))
+    );
+    setSelectedVehicleId(vehicle.id);
+  }
   const todayStr = toDateStr(new Date());
 
   function openCreateForm(dateStr: string) {
@@ -285,6 +293,8 @@ export default function SchedulesPage() {
               ))}
             </Select>
           </div>
+
+          {selectedClientId && <QuickAddVehicle clientId={selectedClientId} onCreated={handleVehicleCreated} />}
 
           <div className="grid grid-cols-2 gap-4">
             <Input type="date" value={formFecha} onChange={(e) => setFormFecha(e.target.value)} required />

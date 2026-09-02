@@ -1,4 +1,4 @@
-# Estado del Proyecto — CHECKPOINT (Fase 11: mejoras de uso diario COMPLETAS y con QA funcional aprobado, sin commit/push/deploy todavía)
+# Estado del Proyecto — CHECKPOINT (Fase 12: flujo Cliente → Vehículo mejorado y verificado, sin commit/push/deploy todavía)
 
 **Fecha del checkpoint**: 2026-09-02
 
@@ -52,6 +52,42 @@ Al finalizar esa revisión, entregar: problemas encontrados, problemas corregido
 - Mantener Taller Mecánico/AUTOMEK en el puerto 3002 si se prueba en local; nunca tocar el proyecto "Wpp" (Wapa Pizza Party) que puede correr en el puerto 3000 en la misma máquina.
 - `.env`/`.env.local` locales tienen secretos de desarrollo (no reutilizar en producción); Vercel tiene sus propias variables de entorno configuradas por el usuario.
 - Git: working tree limpio, un solo commit pusheado a `origin/master`. Cualquier cambio de código nuevo requeriría un nuevo commit (no hay identidad global de Git configurada en esta máquina; se configuró solo local para el repo).
+
+---
+
+## FASE 12 — FLUJO CLIENTE → VEHÍCULO (sesión 2026-09-02/03)
+
+Mejora puntual del alta de clientes y vehículos, sin cambios de arquitectura ni de Prisma (la relación Cliente→Vehículos ya existía; solo se reordenó cuándo y dónde se puede cargar el vehículo).
+
+### 1. Nuevo Cliente (`app/clients/page.tsx`)
+El modal "Nuevo Cliente" agregó un checkbox **"Agregar vehículo ahora"**. Al activarlo se despliega un sub-formulario de vehículo (patente, marca, modelo, año, km) dentro del mismo modal. Al confirmar: `POST /api/clients` y, si corresponde, `POST /api/vehicles` con el `clientId` recién creado (mismos endpoints ya existentes, sin cambios). Si se deja destildado, se crea solo el cliente (0 vehículos), igual que antes.
+
+### 2. Cliente existente (`app/clients/[id]/page.tsx`)
+Ya permitía múltiples vehículos por cliente sin límite (no fue necesario modificarlo) — verificado explícitamente en el QA.
+
+### 3. Nuevo Turno y Nueva Orden (`app/schedules/page.tsx`, `app/work-orders/page.tsx`)
+Nuevo componente reutilizable `components/common/QuickAddVehicle.tsx`: al seleccionar un cliente, aparece un link **"Crear vehículo para este cliente"** que despliega un mini-formulario inline (mismo `POST /api/vehicles` existente). Al crear el vehículo, se agrega a la lista local del cliente seleccionado y **se autoselecciona** en el combo de vehículo — sin recargar la página ni perder ningún otro campo ya cargado en el formulario (fecha/hora/motivo en Turnos; motivo de ingreso/ítems en Órdenes).
+
+### Verificación realizada
+- ✅ `npx tsc --noEmit` sin errores.
+- ✅ `npm run build` — exit code 0, 39/39 páginas.
+- ✅ Cliente + vehículo: creado en un solo paso, vehículo asociado al `clientId` correcto (verificado por API).
+- ✅ Cliente sin vehículo: checkbox destildado → cliente con 0 vehículos.
+- ✅ Múltiples vehículos: mismo cliente con 2 vehículos (QA001, QA002) listados correctamente en su ficha.
+- ✅ Vehículo asociado al cliente correcto: confirmado por `clientId` en la respuesta de la API en cada caso.
+- ✅ Creación desde Turno: "Crear vehículo para este cliente" probado con un cliente sin vehículos; el turno conservó el motivo ya tipeado ("QA turno prueba - no perder datos") y el vehículo nuevo quedó autoseleccionado.
+- ✅ Creación desde Orden: mismo flujo probado con un cliente que ya tenía vehículos; se conservaron el motivo de ingreso y el ítem ya cargados, y el vehículo nuevo quedó autoseleccionado.
+- ✅ Aislamiento por taller: no se agregó ningún endpoint nuevo — `QuickAddVehicle` y el checkbox de Nuevo Cliente reutilizan `POST /api/clients` y `POST /api/vehicles`, que ya derivan `tallerId` desde la sesión en el servidor (mismo patrón auditado en Fase 7/8).
+- ✅ Sin errores de consola en ningún paso del flujo probado.
+- ✅ Registros de prueba (2 clientes QA + 4 vehículos QA) creados y **eliminados al finalizar** — confirmado que no quedó rastro.
+
+### Archivos nuevos
+`components/common/QuickAddVehicle.tsx`.
+
+### Archivos modificados
+`app/clients/page.tsx`, `app/schedules/page.tsx`, `app/work-orders/page.tsx`.
+
+**No se hizo commit, push ni deploy en esta sesión** (según instrucción explícita).
 
 ---
 
