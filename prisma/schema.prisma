@@ -1,0 +1,625 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// FASE 1 — Base y acceso
+// ============================================================================
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String     // hashed with bcrypt
+  name      String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  userTallers UserTaller[]
+
+  @@map("users")
+}
+
+model Taller {
+  id        String     @id @default(cuid())
+
+  nombre    String     // Nombre del taller
+  telefono  String?
+  email     String?
+  direccion String?
+  logo      String?    // URL del logo
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  // Relaciones — Acceso y gestión
+  userTallers UserTaller[]
+
+  // Relaciones — Negocio (Fases 2-5)
+  clients     Client[]
+  quotes      Quote[]
+  workOrders  WorkOrder[]
+  schedules   Schedule[]
+  payments    Payment[]
+
+  // Relaciones — Caja y finanzas (Fase 6)
+  paymentMethods PaymentMethod[]
+  cashMovements CashMovement[]
+  dailyCloses   DailyClose[]
+  clientCredits ClientCredit[]
+
+  // Relaciones — Técnicos (Fase 7)
+  technicians Technician[]
+
+  // Relaciones — Costos (Fase 8)
+  costs       Cost[]
+
+  // Relaciones — Objetivos (Fase 7)
+  goals       Goal[]
+
+  // Auditoría
+  auditLogs   AuditLog[]
+
+  @@map("tallers")
+}
+
+model UserTaller {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tallerId  String
+  taller    Taller     @relation(fields: [tallerId], references: [id], onDelete: Cascade)
+
+  role      String     @default("admin") // admin, technician, etc. para futuro
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([userId, tallerId])
+  @@map("user_tallers")
+}
+
+// ============================================================================
+// FASE 2 — Clientes y Vehículos
+// ============================================================================
+
+model Client {
+  id        String     @id @default(cuid())
+  tallerId  String
+  taller    Taller     @relation(fields: [tallerId], references: [id], onDelete: Cascade)
+
+  nombre    String
+  telefono  String?
+  email     String?
+  direccion String?
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  vehicles   Vehicle[]
+  quotes     Quote[]
+  workOrders WorkOrder[]
+  schedules  Schedule[]
+  credit     ClientCredit?  // Saldo de cuenta corriente
+
+  @@unique([tallerId, email])
+  @@index([tallerId])
+  @@map("clients")
+}
+
+model Vehicle {
+  id        String     @id @default(cuid())
+  clientId  String
+  client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  patente   String     @unique  // Placa/patente única
+  marca     String
+  modelo    String
+  anio      Int
+  kilometraje Int?
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  quotes    Quote[]
+  workOrders WorkOrder[]
+  schedules Schedule[]
+
+  @@index([clientId])
+  @@map("vehicles")
+}
+
+// ============================================================================
+// FASE 3 — Presupuestos
+// ============================================================================
+
+enum QuoteStatus {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
+model Quote {
+  id        String     @id @default(cuid())
+  tallerId  String
+  taller    Taller     @relation(fields: [tallerId], references: [id], onDelete: Cascade)
+
+  clientId  String
+  client    Client     @relation(fields: [clientId], references: [id])
+
+  vehicleId String
+  vehicle   Vehicle    @relation(fields: [vehicleId], references: [id])
+
+  status    QuoteStatus @default(PENDIENTE)
+  total     Float      @default(0)
+
+  observaciones String?
+  fecha     DateTime   @default(now())
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  items     QuoteItem[]
+  workOrder WorkOrder?  // Relación cuando se convierte a orden
+
+  @@index([tallerId])
+  @@index([status])
+  @@map("quotes")
+}
+
+model QuoteItem {
+  id        String     @id @default(cuid())
+  quoteId   String
+  quote     Quote      @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  descripcion String
+  cantidad  Int        @default(1)
+  precioUnitario Float
+  subtotal  Float      // cantidad * precioUnitario
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("quote_items")
+}
+
+// ============================================================================
+// FASE 4 — Órdenes de Trabajo
+// ============================================================================
+
+enum WorkOrderStatus {
+  PRESUPUESTA    // Creada desde presupuesto sin aprobar
+  APROBADA       // Presupuesto aprobado o directa
+  EN_PROCESO     // En reparación
+  TERMINADA      // Reparación completada
+  ENTREGADA      // Entregada al cliente
+}
+
+model WorkOrder {
+  id        String     @id @default(cuid())
+  tallerId  String
+  taller    Taller     @relation(fields: [tallerId], references: [id], onDelete: Cascade)
+
+  clientId  String
+  client    Client     @relation(fields: [clientId], references: [id])
+
+  vehicleId String
+  vehicle   Vehicle    @relation(fields: [vehicleId], references: [id])
+
+  quoteId   String?    @unique
+  quote     Quote?     @relation(fields: [quoteId], references: [id])
+
+  status    WorkOrderStatus @default(APROBADA)
+  total     Float      @default(0)
+
+  motivoIngreso String
+  diagnostico   String?
+  observaciones String?
+
+  kmIngreso  Int?
+  kmEgreso   Int?
+
+  fecha     DateTime   @default(now())
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  items           WorkOrderItem[]
+  payments        Payment[]
+  cashMovements   CashMovement[]  // Movimientos de caja asociados
+
+  @@index([tallerId])
+  @@index([status])
+  @@map("work_orders")
+}
+
+model WorkOrderItem {
+  id        String     @id @default(cuid())
+  workOrderId String
+  workOrder WorkOrder  @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  descripcion String
+  cantidad  Int        @default(1)
+  precioUnitario Float
+  subtotal  Float
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("work_order_items")
+}
+
+// ============================================================================
+// FASE 5 — Agenda / Turnos
+// ============================================================================
+
+enum ScheduleStatus {
+  PENDIENTE      // Turno creado, sin confirmar
+  CONFIRMADO     // Turno confirmado con cliente
+  EN_ESPERA      // Cliente sin confirmar a tiempo
+  CANCELADO      // Cancelado
+  COMPLETADO     // Convertido a orden de trabajo
+}
+
+model Schedule {
+  id        String     @id @default(cuid())
+  tallerId  String
+  taller    Taller     @relation(fields: [tallerId], references: [id], onDelete: Cascade)
+
+  clientId  String
+  client    Client     @relation(fields: [clientId], references: [id])
+
+  vehicleId String
+  vehicle   Vehicle    @relation(fields: [vehicleId], references: [id])
+
+  fecha     DateTime
+  hora      String     // Formato HH:mm
+  motivo    String
+  status    ScheduleStatus @default(PENDIENTE)
+
+  workOrderId String?   @unique
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([vehicleId, fecha, hora])
+  @@index([tallerId])
+  @@index([fecha])
+  @@map("schedules")
+}
+
+// ============================================================================
+// FASE 6 — Caja y Cobros
+// ============================================================================
+
+enum PaymentMethodType {
+  EFECTIVO
+  TRANSFERENCIA
+  TARJETA
+  CUENTA_CORRIENTE
+}
+
+enum PaymentStatus {
+  PAGADO
+  PENDIENTE
+  ANULADO
+}
+
+model PaymentMethod {
+  id        String     @id @default(cuid())
+  tallerId  String
+  taller    Taller     @relation(fields: [tallerId], references: [id], onDelete: Cascade)
+
+  tipo      PaymentMethodType
+  nombre    String     // "Efectivo", "Banco X", "Tarjeta Visa", etc.
+
+  payments  Payment[]
+
+  @@index([tallerId])
+  @@map("payment_methods")
+}
+
+model Payment {
+  id        String     @id @default(cuid())
+  tallerId  String
+  taller    Taller     @relation(fields: [tallerId], references: [id], onDelete: Cascade)
+
+  workOrderId String
+  workOrder WorkOrder  @relation(fields: [workOrderId], references: [id])
+
+  methodId  String
+  method    PaymentMethod @relation(fields: [methodId], references: [id])
+
+  monto     Float
+  status    PaymentStatus @default(PAGADO)
+
+  numeroComprobante String?
+  observaciones String?
+
+  fecha     DateTime   @default(now())
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([tallerId])
+  @@index([fecha])
+  @@map("payments")
+}
+
+// ============================================================================
+// FASE 6+ — Caja y Movimientos (EGRESOS + INGRESOS)
+// ============================================================================
+
+enum CashMovementType {
+  INGRESO    // Cobros de órdenes
+  EGRESO     // Gastos operacionales
+}
+
+enum CashMovementCategory {
+  // Ingresos
+  PAGO_ORDEN
+  ANTICIPO
+
+  // Egresos - Gastos operacionales
+  COMPRA_REPUESTOS
+  COMPRA_MATERIALES
+  GASTO_SERVICIOS
+  GASTO_MANTENIMIENTO
+  GASTO_SUELDOS
+  GASTO_ALQUILER
+  GASTO_SERVICIOS_UTILES
+  GASTO_IMPUESTOS
+  GASTO_OTROS
+
+  // Costos operacionales diarios
+  COSTO_FIJO_DIARIO
+  COSTO_VARIABLE_DIARIO
+}
+
+model CashMovement {
+  id        String     @id @default(cuid())
+  tallerId  String
+  taller    Taller     @relation(fields: [tallerId], references: [id], onDelete: Cascade)
+
+  tipo      CashMovementType
+  categoria CashMovementCategory
+
+  monto     Float
+  descripcion String?
+
+  // Relación opcional a orden (si es pago de orden)
+  workOrderId String?
+  workOrder WorkOrder?  @relation(fields: [workOrderId], references: [id])
+
+  // Relación opcional a payment (si es registrado como pago)
+  paymentId String?
+
+  fecha     DateTime   @default(now())
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([tallerId])
+  @@index([tipo])
+  @@index([categoria])
+  @@index([fecha])
+  @@map("cash_movements")
+}
+
+// ============================================================================
+// FASE 6+ — Cierre de Caja Diaria
+// ============================================================================
+
+enum DailyCloseStatus {
+  ABIERTO
+  CERRADO
+  REABIERTO
+}
+
+model DailyClose {
+  id        String     @id @default(cuid())
+  tallerId  String
+  taller    Taller     @relation(fields: [tallerId], references: [id], onDelete: Cascade)
+
+  fecha     DateTime
+  estado    DailyCloseStatus @default(ABIERTO)
+
+  saldoInicial Float   @default(0)
+  totalIngresos Float  @default(0)
+  totalEgresos Float   @default(0)
+  saldoFinal Float     @default(0)
+
+  notas     String?
+
+  closedAt  DateTime?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([tallerId, fecha])
+  @@index([tallerId])
+  @@map("daily_closes")
+}
+
+// ============================================================================
+// FASE 6+ — Cuenta Corriente por Cliente
+// ============================================================================
+
+model ClientCredit {
+  id        String     @id @default(cuid())
+  tallerId  String
+  taller    Taller     @relation(fields: [tallerId], references: [id], onDelete: Cascade)
+
+  clientId  String     @unique
+  client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  saldo     Float      @default(0)      // Saldo actual (positivo = a favor de cliente, negativo = debe)
+  creditLimit Float?                    // Límite de crédito opcional
+
+  updatedAt DateTime   @updatedAt
+  createdAt DateTime   @default(now())
+
+  @@unique([tallerId, clientId])
+  @@index([tallerId])
+  @@map("client_credits")
+}
+
+// ============================================================================
+// FASE 7+ — Técnicos
+// ============================================================================
+
+model Technician {
+  id        String     @id @default(cuid())
+  tallerId  String
+  taller    Taller     @relation(fields: [tallerId], references: [id], onDelete: Cascade)
+
+  nombre    String
+  email     String?
+  telefono  String?
+  especialidad String?
+  activo    Boolean    @default(true)
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([tallerId])
+  @@map("technicians")
+}
+
+// ============================================================================
+// FASE 8+ — Costos Fijos y Variables
+// ============================================================================
+
+enum CostTypeEnum {
+  FIJO
+  VARIABLE
+}
+
+model Cost {
+  id        String     @id @default(cuid())
+  tallerId  String
+  taller    Taller     @relation(fields: [tallerId], references: [id], onDelete: Cascade)
+
+  tipo      CostTypeEnum
+  categoria String     // MATERIA_PRIMA, MANO_OBRA, SERVICIOS, etc.
+  descripcion String
+
+  monto     Float
+  mes       Int        // 1-12
+  anio      Int
+
+  workOrderId String?   // Opcional, si es costo de una orden específica
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([tallerId])
+  @@index([tipo])
+  @@map("costs")
+}
+
+// ============================================================================
+// FASE 7+ — Objetivos y Metas
+// ============================================================================
+
+enum GoalType {
+  INGRESO_MENSUAL
+  ORDENES_MENSUALES
+  CLIENTES_NUEVOS
+}
+
+enum GoalStatus {
+  EN_PROGRESO
+  ALCANZADO
+  NO_ALCANZADO
+  CANCELADO
+}
+
+model Goal {
+  id        String     @id @default(cuid())
+  tallerId  String
+  taller    Taller     @relation(fields: [tallerId], references: [id], onDelete: Cascade)
+
+  tipo      GoalType
+  objetivo  Float      // Valor objetivo
+  alcanzado Float      @default(0)
+
+  mes       Int        // 1-12
+  anio      Int
+
+  estado    GoalStatus @default(EN_PROGRESO)
+  notas     String?
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([tallerId, tipo, mes, anio])
+  @@index([tallerId])
+  @@map("goals")
+}
+
+// ============================================================================
+// AUDITORÍA — Acciones Sensibles
+// ============================================================================
+
+enum AuditAction {
+  // Presupuestos
+  QUOTE_CREATED
+  QUOTE_APPROVED
+  QUOTE_REJECTED
+  QUOTE_CONVERTED_TO_WORK_ORDER
+
+  // Órdenes
+  WORK_ORDER_CREATED
+  WORK_ORDER_STATUS_CHANGED
+  WORK_ORDER_COMPLETED
+  WORK_ORDER_DELIVERED
+
+  // Pagos
+  PAYMENT_RECORDED
+  PAYMENT_ANNULLED
+  PAYMENT_UPDATED
+
+  // Caja
+  CASH_MOVEMENT_RECORDED
+  DAILY_CLOSE_CLOSED
+  DAILY_CLOSE_REOPENED
+
+  // Otras
+  CLIENT_CREDIT_UPDATED
+  SCHEDULE_STATUS_CHANGED
+}
+
+model AuditLog {
+  id        String     @id @default(cuid())
+  tallerId  String
+  taller    Taller     @relation(fields: [tallerId], references: [id], onDelete: Cascade)
+
+  accion    AuditAction
+  entityType String     // QUOTE, WORK_ORDER, PAYMENT, CASH_MOVEMENT, etc.
+  entityId  String
+
+  oldValue  String?    // JSON string del valor anterior
+  newValue  String?    // JSON string del valor nuevo
+
+  descripcion String?
+
+  timestamp DateTime   @default(now())
+  createdAt DateTime   @default(now())
+
+  @@index([tallerId])
+  @@index([timestamp])
+  @@index([entityType])
+  @@map("audit_logs")
+}
+
+// ============================================================================
+// ÍNDICES PARA PERFORMANCE
+// ============================================================================
+
+// Ya hay índices automáticos en @id y @unique
+// Los índices específicos están agregados en cada modelo
