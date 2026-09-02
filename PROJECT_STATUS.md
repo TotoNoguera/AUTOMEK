@@ -1,4 +1,4 @@
-# Estado del Proyecto — CHECKPOINT (Fase 10: PREMIUMIZACIÓN VISUAL completa, sin deploy/push todavía)
+# Estado del Proyecto — CHECKPOINT (Fase 11: mejoras de uso diario COMPLETAS y con QA funcional aprobado, sin commit/push/deploy todavía)
 
 **Fecha del checkpoint**: 2026-09-02
 
@@ -52,6 +52,78 @@ Al finalizar esa revisión, entregar: problemas encontrados, problemas corregido
 - Mantener Taller Mecánico/AUTOMEK en el puerto 3002 si se prueba en local; nunca tocar el proyecto "Wpp" (Wapa Pizza Party) que puede correr en el puerto 3000 en la misma máquina.
 - `.env`/`.env.local` locales tienen secretos de desarrollo (no reutilizar en producción); Vercel tiene sus propias variables de entorno configuradas por el usuario.
 - Git: working tree limpio, un solo commit pusheado a `origin/master`. Cualquier cambio de código nuevo requeriría un nuevo commit (no hay identidad global de Git configurada en esta máquina; se configuró solo local para el repo).
+
+---
+
+## FASE 11 — MEJORA DE PRODUCTO PARA USO DIARIO (sesión 2026-09-02/03)
+
+Mejoras funcionales orientadas al uso cotidiano real de un taller (no un rediseño). Sin cambios de arquitectura, Prisma, API, autenticación ni módulos existentes — todo reutiliza endpoints y datos ya existentes; el único archivo nuevo de lógica es `lib/whatsapp.ts` (helper puro, sin red).
+
+### 1. Dashboard — "Tu día"
+`app/dashboard/page.tsx` ahora prioriza la operación del día usando los mismos fetches que ya tenía (`/api/dashboard/stats`, `/api/schedules`, `/api/work-orders`, `/api/audit-logs`), agregando cómputo client-side:
+- **Turnos de Hoy** (lista con hora, cliente, vehículo, estado y acción "Confirmar" + WhatsApp).
+- **Vehículos Actualmente en el Taller** (órdenes `EN_PROCESO`, con días en taller).
+- **Listos para Entregar** (órdenes `TERMINADA`, con saldo pendiente real — calculado igual que en `/api/debts` — y botones WhatsApp "Avisar"/"Cobrar").
+- **Turnos Pendientes de Confirmar** (contador del día).
+- **Dinero Pendiente de Cobro** (reutiliza `stats.deudasPendientes`, con link a Deudas).
+- **Órdenes Demoradas**: heurística explícita y documentada en el código — orden no entregada (`APROBADA`/`EN_PROCESO`) con `fecha` de **3+ días** de antigüedad. No es un dato inventado, es un umbral de negocio razonable aplicado a un campo real.
+- **Alertas útiles**: reemplazadas por 4 accionables (turnos sin confirmar, órdenes demoradas, deudas pendientes, vehículos listos para entregar), cada una con link directo.
+- **"Desde tu última visita"**: usa una marca de tiempo guardada en `localStorage` del navegador (no hay campo de "último login" en el modelo `User`, y no se agregó uno). Se filtran los mismos logs de auditoría reales ya cargados. Etiquetado honestamente como algo local al dispositivo, no como historial de sesiones del servidor.
+
+### 2. Búsqueda Global
+`components/common/GlobalSearch.tsx`, integrada en el `Topbar` (botón + atajo `Ctrl/Cmd+K`). Al abrirse, carga una vez `/api/clients`, `/api/vehicles` y `/api/work-orders` (sin filtro, endpoints ya existentes) y filtra client-side por nombre, teléfono, email, patente, marca, modelo, motivo y los 6 últimos caracteres del ID de la orden (el mismo "número" que ya se mostraba como `#Orden`). Resultado agrupado por tipo, con navegación directa al registro. Cero endpoints nuevos.
+
+### 3. Ficha del Vehículo
+`app/vehicles/[id]/history/page.tsx` (ya existente desde Fase 6) ahora muestra además: **Última visita** (fecha máxima entre sus órdenes, presupuestos y turnos reales) y **Trabajos realizados** (conteo de ítems reales). **"Próximos mantenimientos" se omitió deliberadamente**: no existe en el modelo ningún campo de intervalo de mantenimiento ni historial de service estructurado, y agregar una predicción habría significado inventar un dato — en línea con la regla explícita del usuario de no inventar datos ni calcular métricas sin información suficiente.
+
+### 4. Entregas
+No se creó una pantalla nueva: el bloque **"Listos para Entregar"** vive en el Dashboard (punto 1), con cliente, vehículo, saldo pendiente real y accesos a la orden y a WhatsApp.
+
+### 5. Turnos
+`app/schedules/page.tsx`: la tabla de turnos del día ganó una acción **"Confirmar"** (mismo `PUT /api/schedules/[id]` que ya usaba la ficha de turno, sin cambios de API) para turnos `PENDIENTE`, más un botón de WhatsApp para confirmar por chat cuando el cliente tiene teléfono cargado.
+
+### 6. Caja
+`app/cash-movements/page.tsx`: nuevo resumen visual (Saldo Inicial del día, Ingresos de Hoy, Egresos de Hoy, Saldo Actual). El saldo inicial se toma del `saldoFinal` del último cierre (`/api/daily-closes`, mismo criterio de "carry-over" ya documentado en Fase 8); ingresos/egresos de hoy usan `/api/cash-movements?from=&to=` (parámetro que ya existía, usado por la página de Cierre de Caja).
+
+### 7. Actividad Reciente
+Cubierto en el punto 1 del Dashboard ("Desde tu última visita").
+
+### 8. Alertas Útiles
+Cubierto en el punto 1 del Dashboard.
+
+### 9. WhatsApp
+`lib/whatsapp.ts`: helper `buildWhatsAppLink(telefono, mensaje)` que genera un link `wa.me/...` **solo si el cliente tiene teléfono cargado** (nunca inventa números) + 3 generadores de mensaje (confirmar turno, vehículo listo, recordatorio de pago). No es un sistema de mensajería propio — son links `<a target="_blank">` a WhatsApp Web/App. Integrado en: Dashboard (turnos de hoy, listos para entregar), Agenda (confirmar turno), Deudas (recordar pago, en ambas tablas), y Detalle de Orden de Trabajo (avisar listo / recordar pago, condicionado al estado y al saldo real).
+
+### Verificación realizada
+- ✅ `npx tsc --noEmit` sin errores en cada tanda.
+- ✅ `npm run build` — **exit code 0**, 39/39 páginas.
+- ✅ Probado en navegador real (`localhost:3002`, sesión `smoketest.automek@example.com`, datos reales/DEMO): Dashboard completo (alertas, Tu día, listos para entregar con saldo real, actividad "desde tu última visita"), Búsqueda Global (Ctrl+K, resultado correcto buscando "smoke" → cliente + vehículo + orden), Agenda (botón Confirmar cambió el turno de PENDIENTE a CONFIRMADO vía la API real, verificado y revertido a su estado original), Ficha de Vehículo (última visita y trabajos realizados correctos), Caja (resumen del día con valores correctos), Deudas (botón WhatsApp presente para clientes con teléfono y **correctamente ausente** para "Cliente Smoke Test", que no tiene teléfono cargado — confirma que no se inventan números).
+- ✅ Sin errores de consola nuevos en ninguna página (un único 400 observado era residual de una llamada manual de prueba propia, no del código de producto).
+- ✅ Funcionalidades existentes intactas: no se tocó ningún `route.ts`, `lib/auth.ts`, `lib/db.ts`, `lib/validations.ts` ni `prisma/schema.prisma`.
+
+### Archivos nuevos
+`lib/whatsapp.ts`, `components/common/GlobalSearch.tsx`.
+
+### Archivos modificados
+`app/dashboard/page.tsx`, `app/schedules/page.tsx`, `app/cash-movements/page.tsx`, `app/debts/page.tsx`, `app/work-orders/[id]/page.tsx`, `app/vehicles/[id]/history/page.tsx`, `components/layout/Topbar.tsx`.
+
+**No se hizo commit, push ni deploy en esta sesión** (según instrucción explícita).
+
+### QA funcional de Fase 11 (sesión posterior, mismo día) — 11/11 ✅, sin bugs, sin cambios de código
+
+1. ✅ Dashboard "Tu día" con datos reales — verificado con la sesión `smoketest.automek@example.com`.
+2. ✅ Búsqueda global — probado por nombre (cliente + vehículo + orden con un solo término).
+3. ✅ Ficha de vehículo — "Última visita" (1/9/2026) e historial coherentes con las órdenes/presupuestos/turnos reales.
+4. ✅ "Listos para entregar" — saldo pendiente verificado exacto contra `/api/debts` para los mismos clientes (DEMO Cliente 10: $400.00, DEMO Cliente 03: $950.00).
+5. ✅ Turnos — botón "Confirmar" probado contra la API real (`PUT /api/schedules/[id]`) sobre el turno de smoke test y **revertido a su estado original** tras la prueba.
+6. ✅ Resumen de caja — verificado que coincide exactamente con el cierre de caja real del día ($2150 ingresos / $2950 egresos / -$800 saldo, igual en `/cash-movements` y `/daily-closes`).
+7. ✅ WhatsApp desde Deudas y Órdenes — presente cuando el cliente tiene teléfono, **ausente** para "Cliente Smoke Test" (sin teléfono), confirmando que no se inventan números.
+8. ✅ Contenido de los mensajes de WhatsApp — decodificado el `href` de cada botón (turno, "listo", "cobrar"/"recordar"): nombre, patente, fecha, hora, motivo y monto coinciden exactamente con los datos reales en todos los casos probados.
+9. ✅ Aislamiento por taller — verificado por revisión de código: cada `fetch` nuevo (Dashboard, Búsqueda Global, Agenda, Caja, Deudas, Orden, Ficha de Vehículo) llama exclusivamente a endpoints ya existentes que derivan `tallerId` desde la sesión en el servidor; no se agregó ningún endpoint nuevo ni se envía `tallerId` desde el cliente. Mismo patrón ya atacado bidireccionalmente en Fase 7/8.
+10. ✅ Sin regresiones — barrido completo de Clientes, Cliente detalle, Cuenta Corriente, Vehículos, Presupuestos, Técnicos, Objetivos, Costos, Auditoría, Reportes (Mensual y P&L), Cierre de Caja, Órdenes: sin errores de consola en ninguna página.
+11. ✅ `npm run build` — exit code 0, 39/39 páginas.
+
+**Errores encontrados**: ninguno. **Archivos modificados**: ninguno adicional a los ya listados en Fase 11 (el QA no requirió correcciones).
 
 ---
 

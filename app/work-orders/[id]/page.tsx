@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Printer, Pencil, Trash2, Plus } from "lucide-react";
+import { ArrowLeft, Printer, Pencil, Trash2, Plus, MessageCircle } from "lucide-react";
 import { useToast } from "@/components/common/ToastProvider";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
 import { Skeleton } from "@/components/ui/EmptyState";
 import { cn } from "@/lib/utils";
+import { buildWhatsAppLink, whatsAppVehiculoListo, whatsAppRecordatorioPago } from "@/lib/whatsapp";
 
 interface WorkOrderItem {
   id: string;
@@ -20,6 +21,11 @@ interface WorkOrderItem {
   cantidad: number;
   precioUnitario: number;
   subtotal: number;
+}
+
+interface Payment {
+  monto: number;
+  status: string;
 }
 
 interface WorkOrder {
@@ -32,9 +38,10 @@ interface WorkOrder {
   observaciones?: string;
   kmIngreso?: number;
   kmEgreso?: number;
-  client: { id: string; nombre: string };
+  client: { id: string; nombre: string; telefono?: string };
   vehicle: { id: string; patente: string; marca: string; modelo: string };
   items: WorkOrderItem[];
+  payments?: Payment[];
   margen?: number;
 }
 
@@ -262,6 +269,42 @@ export default function WorkOrderDetailPage() {
                   </button>
                 ))}
               </div>
+
+              {(() => {
+                const pendiente = (workOrder.payments || []).length
+                  ? workOrder.total - (workOrder.payments || []).filter((p) => p.status === "PAGADO").reduce((s, p) => s + p.monto, 0)
+                  : workOrder.total;
+                const listoLink =
+                  (workOrder.status === "TERMINADA" || workOrder.status === "ENTREGADA") &&
+                  buildWhatsAppLink(workOrder.client.telefono, whatsAppVehiculoListo(workOrder.client.nombre, workOrder.vehicle.patente));
+                const cobroLink =
+                  pendiente > 0.01 && buildWhatsAppLink(workOrder.client.telefono, whatsAppRecordatorioPago(workOrder.client.nombre, pendiente, `orden #${workOrder.id.slice(-6)}`));
+                if (!listoLink && !cobroLink) return null;
+                return (
+                  <div className="no-print mb-4 flex flex-wrap gap-2">
+                    {listoLink && (
+                      <a
+                        href={listoLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" /> Avisar por WhatsApp que está listo
+                      </a>
+                    )}
+                    {cobroLink && (
+                      <a
+                        href={cobroLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-500/20"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" /> Recordar pago pendiente
+                      </a>
+                    )}
+                  </div>
+                );
+              })()}
 
               {editing ? (
                 <form onSubmit={handleSaveEdit} className="space-y-4 border-t border-carbon-700 pt-4">

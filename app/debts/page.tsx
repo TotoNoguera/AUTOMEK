@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CircleDollarSign, FileSearch } from "lucide-react";
+import { CircleDollarSign, FileSearch, MessageCircle } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
 import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
+import { buildWhatsAppLink, whatsAppRecordatorioPago } from "@/lib/whatsapp";
 
 interface UnpaidWorkOrder {
   id: string;
@@ -16,14 +17,14 @@ interface UnpaidWorkOrder {
   total: number;
   pagado: number;
   pendiente: number;
-  client: { id: string; nombre: string };
+  client: { id: string; nombre: string; telefono?: string };
   vehicle: { patente: string };
 }
 
 interface NegativeCredit {
   id: string;
   saldo: number;
-  client: { id: string; nombre: string };
+  client: { id: string; nombre: string; telefono?: string };
 }
 
 export default function DebtsPage() {
@@ -89,7 +90,17 @@ export default function DebtsPage() {
                         <Td className="text-emerald-400">${wo.pagado.toFixed(2)}</Td>
                         <Td className="font-semibold text-red-400">${wo.pendiente.toFixed(2)}</Td>
                         <Td>
-                          <div className="flex justify-end">
+                          <div className="flex justify-end gap-3">
+                            {buildWhatsAppLink(wo.client.telefono, whatsAppRecordatorioPago(wo.client.nombre, wo.pendiente, `orden #${wo.id.slice(-6)}`)) && (
+                              <a
+                                href={buildWhatsAppLink(wo.client.telefono, whatsAppRecordatorioPago(wo.client.nombre, wo.pendiente, `orden #${wo.id.slice(-6)}`))!}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 hover:text-emerald-300"
+                              >
+                                <MessageCircle className="h-3.5 w-3.5" /> Recordar
+                              </a>
+                            )}
                             <Link
                               href={`/work-orders/${wo.id}`}
                               className="inline-flex items-center gap-1 text-xs font-medium text-brand-400 hover:text-brand-300"
@@ -128,7 +139,17 @@ export default function DebtsPage() {
                         <Td className="font-medium">{c.client.nombre}</Td>
                         <Td className="font-semibold text-red-400">${c.saldo.toFixed(2)}</Td>
                         <Td>
-                          <div className="flex justify-end">
+                          <div className="flex justify-end gap-3">
+                            {buildWhatsAppLink(c.client.telefono, whatsAppRecordatorioPago(c.client.nombre, Math.abs(c.saldo), "cuenta corriente")) && (
+                              <a
+                                href={buildWhatsAppLink(c.client.telefono, whatsAppRecordatorioPago(c.client.nombre, Math.abs(c.saldo), "cuenta corriente"))!}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 hover:text-emerald-300"
+                              >
+                                <MessageCircle className="h-3.5 w-3.5" /> Recordar
+                              </a>
+                            )}
                             <Link
                               href={`/clients/${c.client.id}/credit`}
                               className="inline-flex items-center gap-1 text-xs font-medium text-brand-400 hover:text-brand-300"

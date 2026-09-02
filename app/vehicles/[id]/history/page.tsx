@@ -105,6 +105,15 @@ export default function VehicleHistoryPage() {
         <>
           {(() => {
             const { vehicle, workOrders, quotes, schedules } = data;
+            const allDates = [
+              ...workOrders.map((w) => w.fecha),
+              ...quotes.map((q) => q.fecha),
+              ...schedules.map((s) => s.fecha),
+            ];
+            const ultimaVisita = allDates.length
+              ? new Date(Math.max(...allDates.map((d) => new Date(d).getTime())))
+              : null;
+            const trabajosRealizados = workOrders.reduce((sum, w) => sum + w.items.length, 0);
             return (
               <>
                 <Card className="mb-8">
@@ -116,7 +125,20 @@ export default function VehicleHistoryPage() {
                         {vehicle.client.nombre}
                       </Link>
                     </p>
-                    <p className="mt-1 text-sm text-carbon-400">Kilometraje actual: {vehicle.kilometraje ?? "-"}</p>
+                    <div className="mt-4 grid grid-cols-3 gap-4 border-t border-carbon-700 pt-4">
+                      <div>
+                        <span className="text-xs text-carbon-400">Kilometraje actual</span>
+                        <p className="text-carbon-100">{vehicle.kilometraje ?? "-"}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-carbon-400">Última visita</span>
+                        <p className="text-carbon-100">{ultimaVisita ? ultimaVisita.toLocaleDateString("es-AR") : "Sin visitas registradas"}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-carbon-400">Trabajos realizados</span>
+                        <p className="text-carbon-100">{trabajosRealizados}</p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
 

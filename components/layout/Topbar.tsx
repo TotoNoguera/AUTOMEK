@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signOut } from "next-auth/react";
 import { LogOut, Menu } from "lucide-react";
 import { MobileSidebar } from "./Sidebar";
+import { GlobalSearch } from "@/components/common/GlobalSearch";
 
 export function Topbar({ userName, tallerName }: { userName?: string; tallerName?: string }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -33,6 +34,7 @@ export function Topbar({ userName, tallerName }: { userName?: string; tallerName
         </div>
 
         <div className="flex items-center gap-3">
+          <GlobalSearch />
           <div className="hidden items-center gap-2 sm:flex">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-500/15 text-xs font-semibold text-brand-400 ring-1 ring-inset ring-brand-500/30">
               {initial}

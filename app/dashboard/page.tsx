@@ -6,7 +6,6 @@ import { useEffect, useState, Suspense } from "react";
 import {
   Wrench,
   CircleDollarSign,
-  TrendingDown,
   AlertTriangle,
   Users,
   Car,
@@ -18,6 +17,10 @@ import {
   Clock,
   Activity,
   CheckCircle2,
+  MessageCircle,
+  PackageCheck,
+  Timer,
+  History,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -25,8 +28,14 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/common/StatCard";
 import { formatCurrency } from "@/lib/utils";
+import { buildWhatsAppLink, whatsAppConfirmTurno, whatsAppVehiculoListo, whatsAppRecordatorioPago } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
+
+// Heurística de negocio: una orden se considera "demorada" si sigue sin
+// entregarse (no ENTREGADA) y su fecha de ingreso supera este umbral.
+const DIAS_DEMORA = 3;
+const LAST_VISIT_KEY = "automek_last_visit_ts";
 
 interface StatsData {
   ordenesActivas: number;
@@ -46,13 +55,24 @@ interface ScheduleItem {
   hora: string;
   motivo: string;
   status: string;
-  client: { nombre: string };
+  client: { nombre: string; telefono?: string };
   vehicle: { patente: string };
+}
+
+interface Payment {
+  monto: number;
+  status: string;
 }
 
 interface WorkOrderItem {
   id: string;
   status: string;
+  total: number;
+  motivoIngreso: string;
+  fecha: string;
+  client: { nombre: string; telefono?: string };
+  vehicle: { patente: string };
+  payments: Payment[];
 }
 
 interface AuditLogItem {
@@ -129,12 +149,37 @@ function timeAgo(iso: string): string {
   return `hace ${days} d`;
 }
 
+function pendienteDe(wo: WorkOrderItem): number {
+  const pagado = wo.payments.filter((p) => p.status === "PAGADO").reduce((s, p) => s + p.monto, 0);
+  return wo.total - pagado;
+}
+
+function daysSince(iso: string): number {
+  return Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function WhatsAppButton({ href, label }: { href: string | null; label: string }) {
+  if (!href) return null;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-400 hover:bg-emerald-500/20"
+    >
+      <MessageCircle className="h-3 w-3" /> {label}
+    </a>
+  );
+}
+
 function DashboardContent() {
   const { data: session } = useSession();
   const [stats, setStats] = useState<StatsData | null>(null);
   const [schedules, setSchedules] = useState<ScheduleItem[] | null>(null);
   const [workOrders, setWorkOrders] = useState<WorkOrderItem[] | null>(null);
   const [activity, setActivity] = useState<AuditLogItem[] | null>(null);
+  const [lastVisit, setLastVisit] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
     async function loadAll() {
@@ -156,11 +201,36 @@ function DashboardContent() {
     loadAll();
   }, []);
 
+  // "Desde tu última visita" se basa en una marca guardada en este navegador
+  // (no hay un registro de "último login" en el servidor todavía).
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(LAST_VISIT_KEY);
+      setLastVisit(stored);
+      window.localStorage.setItem(LAST_VISIT_KEY, new Date().toISOString());
+    } catch {
+      setLastVisit(null);
+    }
+  }, []);
+
   const today = new Date().toISOString().slice(0, 10);
+
+  const turnosHoy = (schedules || [])
+    .filter((s) => s.fecha.slice(0, 10) === today && s.status !== "CANCELADO")
+    .sort((a, b) => a.hora.localeCompare(b.hora));
+
+  const turnosPorConfirmarHoy = turnosHoy.filter((s) => s.status === "PENDIENTE");
+
   const upcomingSchedules = (schedules || [])
-    .filter((s) => s.fecha.slice(0, 10) >= today && s.status !== "CANCELADO" && s.status !== "COMPLETADO")
+    .filter((s) => s.fecha.slice(0, 10) > today && s.status !== "CANCELADO" && s.status !== "COMPLETADO")
     .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora))
     .slice(0, 5);
+
+  const vehiculosEnTaller = (workOrders || []).filter((wo) => wo.status === "EN_PROCESO");
+  const listosParaEntregar = (workOrders || []).filter((wo) => wo.status === "TERMINADA");
+  const ordenesDemoradas = (workOrders || []).filter(
+    (wo) => (wo.status === "APROBADA" || wo.status === "EN_PROCESO") && daysSince(wo.fecha) >= DIAS_DEMORA
+  );
 
   const statusCounts = (workOrders || []).reduce<Record<string, number>>((acc, wo) => {
     if (wo.status === "ENTREGADA") return acc;
@@ -170,31 +240,42 @@ function DashboardContent() {
   const activeStatusOrder = ["PRESUPUESTA", "APROBADA", "EN_PROCESO", "TERMINADA"];
 
   const recentActivity = (activity || []).slice(0, 6);
+  const activitySinceLastVisit = lastVisit
+    ? (activity || []).filter((a) => new Date(a.timestamp).getTime() > new Date(lastVisit).getTime())
+    : [];
 
-  const alerts: Array<{ tone: "danger" | "warning" | "info"; text: string }> = [];
+  const alerts: Array<{ tone: "danger" | "warning" | "info"; text: string; href: string }> = [];
+  if (turnosPorConfirmarHoy.length > 0) {
+    alerts.push({
+      tone: "warning",
+      text: `${turnosPorConfirmarHoy.length} turno${turnosPorConfirmarHoy.length > 1 ? "s" : ""} de hoy sin confirmar.`,
+      href: "/schedules",
+    });
+  }
+  if (ordenesDemoradas.length > 0) {
+    alerts.push({
+      tone: "danger",
+      text: `${ordenesDemoradas.length} orden${ordenesDemoradas.length > 1 ? "es" : ""} demorada${ordenesDemoradas.length > 1 ? "s" : ""} (${DIAS_DEMORA}+ días sin avanzar).`,
+      href: "/work-orders",
+    });
+  }
   if (stats && stats.deudasPendientes > 0) {
     alerts.push({
       tone: "warning",
-      text: `Hay ${formatCurrency(stats.deudasPendientes)} en deudas pendientes de cobro.`,
+      text: `${formatCurrency(stats.deudasPendientes)} en deudas pendientes de cobro.`,
+      href: "/debts",
     });
   }
-  const turnosHoy = (schedules || []).filter(
-    (s) => s.fecha.slice(0, 10) === today && (s.status === "PENDIENTE" || s.status === "CONFIRMADO")
-  );
-  if (turnosHoy.length > 0) {
+  if (listosParaEntregar.length > 0) {
     alerts.push({
       tone: "info",
-      text: `Tenés ${turnosHoy.length} turno${turnosHoy.length > 1 ? "s" : ""} agendado${turnosHoy.length > 1 ? "s" : ""} para hoy.`,
-    });
-  }
-  if (stats && stats.egresosMes > stats.cobrosMes && stats.cobrosMes > 0) {
-    alerts.push({
-      tone: "danger",
-      text: "Los egresos del mes superan a los cobros del mes.",
+      text: `${listosParaEntregar.length} vehículo${listosParaEntregar.length > 1 ? "s" : ""} listo${listosParaEntregar.length > 1 ? "s" : ""} para entregar.`,
+      href: "/work-orders",
     });
   }
 
   const isLoading = stats === null;
+  const opsLoading = schedules === null || workOrders === null;
 
   return (
     <AppShell>
@@ -205,18 +286,19 @@ function DashboardContent() {
           Hola, {session?.user?.name?.split(" ")[0] || "bienvenido"} 👋
         </h1>
         <p className="mt-1 text-sm text-carbon-400">
-          Este es el estado de tu taller hoy, {new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })}.
+          Este es tu día, {new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })}.
         </p>
       </div>
 
-      {/* Alertas */}
+      {/* Alertas accionables */}
       {alerts.length > 0 && (
         <div className="mb-6 space-y-2">
           {alerts.map((a, i) => (
-            <div
+            <Link
               key={i}
+              href={a.href}
               className={
-                "flex items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-sm " +
+                "flex items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-sm transition-opacity hover:opacity-90 " +
                 (a.tone === "danger"
                   ? "border-red-500/30 bg-red-500/10 text-red-300"
                   : a.tone === "warning"
@@ -226,30 +308,160 @@ function DashboardContent() {
             >
               <AlertTriangle className="h-4 w-4 shrink-0" />
               {a.text}
-            </div>
+            </Link>
           ))}
         </div>
       )}
 
-      {/* KPIs */}
-      {isLoading ? (
-        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24" />
-          ))}
-        </div>
-      ) : (
-        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <StatCard label="Órdenes Activas" value={String(stats!.ordenesActivas)} icon={Wrench} tone="brand" />
-          <StatCard label="Cobros del Mes" value={formatCurrency(stats!.cobrosMes)} icon={CircleDollarSign} tone="success" />
-          <StatCard label="Egresos del Mes" value={formatCurrency(stats!.egresosMes)} icon={TrendingDown} tone="danger" />
-          <StatCard label="Deudas Pendientes" value={formatCurrency(stats!.deudasPendientes)} icon={AlertTriangle} tone="warning" />
-        </div>
-      )}
+      {/* Tu día: operación en curso */}
+      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+        {opsLoading ? (
+          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20" />)
+        ) : (
+          <>
+            <StatCard label="Turnos Hoy" value={String(turnosHoy.length)} icon={CalendarDays} tone="brand" />
+            <StatCard label="En el Taller" value={String(vehiculosEnTaller.length)} icon={Wrench} tone="warning" />
+            <StatCard label="Listos para Entregar" value={String(listosParaEntregar.length)} icon={PackageCheck} tone="success" />
+            <StatCard label="Por Confirmar Hoy" value={String(turnosPorConfirmarHoy.length)} icon={Timer} tone="neutral" />
+          </>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* Columna principal */}
         <div className="space-y-5 lg:col-span-2">
+          {/* Turnos de hoy */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Turnos de Hoy</CardTitle>
+              <Link href="/schedules" className="text-xs text-brand-400 hover:underline">Ver agenda</Link>
+            </CardHeader>
+            <CardContent>
+              {opsLoading ? (
+                <Skeleton className="h-20 w-full" />
+              ) : turnosHoy.length === 0 ? (
+                <EmptyState icon={CalendarDays} title="No hay turnos agendados para hoy" />
+              ) : (
+                <ul className="space-y-2">
+                  {turnosHoy.map((s) => (
+                    <li key={s.id} className="flex items-center justify-between gap-3 rounded-lg border border-carbon-700 bg-carbon-900/40 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="flex items-center gap-2 truncate text-sm font-medium text-carbon-100">
+                          <Clock className="h-3.5 w-3.5 text-carbon-400" /> {s.hora} — {s.client.nombre}
+                        </p>
+                        <p className="truncate text-xs text-carbon-500">{s.vehicle.patente} · {s.motivo}</p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Badge variant={SCHEDULE_STATUS_COLORS[s.status]}>{s.status.replace("_", " ")}</Badge>
+                        {s.status === "PENDIENTE" && (
+                          <WhatsAppButton
+                            href={buildWhatsAppLink(
+                              s.client.telefono,
+                              whatsAppConfirmTurno(s.client.nombre, new Date(`${s.fecha.slice(0, 10)}T00:00:00`).toLocaleDateString("es-AR"), s.hora, s.motivo)
+                            )}
+                            label="Confirmar"
+                          />
+                        )}
+                        <Link href={`/schedules/${s.id}`} className="text-xs font-medium text-brand-400 hover:text-brand-300">Ver</Link>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Vehículos en el taller */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Vehículos Actualmente en el Taller</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {opsLoading ? (
+                <Skeleton className="h-20 w-full" />
+              ) : vehiculosEnTaller.length === 0 ? (
+                <EmptyState icon={Wrench} title="No hay vehículos en proceso ahora mismo" />
+              ) : (
+                <ul className="space-y-2">
+                  {vehiculosEnTaller.map((wo) => (
+                    <li key={wo.id} className="flex items-center justify-between gap-3 rounded-lg border border-carbon-700 bg-carbon-900/40 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-carbon-100">{wo.vehicle.patente} — {wo.client.nombre}</p>
+                        <p className="truncate text-xs text-carbon-500">{wo.motivoIngreso} · {daysSince(wo.fecha)} día{daysSince(wo.fecha) !== 1 ? "s" : ""} en taller</p>
+                      </div>
+                      <Link href={`/work-orders/${wo.id}`} className="shrink-0 text-xs font-medium text-brand-400 hover:text-brand-300">Ver orden</Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Listos para entregar */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Listos para Entregar</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {opsLoading ? (
+                <Skeleton className="h-20 w-full" />
+              ) : listosParaEntregar.length === 0 ? (
+                <EmptyState icon={PackageCheck} title="No hay vehículos listos para entregar" />
+              ) : (
+                <ul className="space-y-2">
+                  {listosParaEntregar.map((wo) => {
+                    const saldo = pendienteDe(wo);
+                    return (
+                      <li key={wo.id} className="flex items-center justify-between gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-carbon-100">{wo.vehicle.patente} — {wo.client.nombre}</p>
+                          <p className="truncate text-xs text-carbon-500">
+                            Saldo: {saldo > 0.01 ? <span className="font-medium text-amber-400">{formatCurrency(saldo)}</span> : <span className="text-emerald-400">Pagado</span>}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <WhatsAppButton
+                            href={buildWhatsAppLink(wo.client.telefono, whatsAppVehiculoListo(wo.client.nombre, wo.vehicle.patente))}
+                            label="Avisar"
+                          />
+                          {saldo > 0.01 && (
+                            <WhatsAppButton
+                              href={buildWhatsAppLink(wo.client.telefono, whatsAppRecordatorioPago(wo.client.nombre, saldo, `orden #${wo.id.slice(-6)}`))}
+                              label="Cobrar"
+                            />
+                          )}
+                          <Link href={`/work-orders/${wo.id}`} className="text-xs font-medium text-brand-400 hover:text-brand-300">Ver</Link>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Órdenes demoradas */}
+          {ordenesDemoradas.length > 0 && (
+            <Card className="border-red-500/20">
+              <CardHeader>
+                <CardTitle>Órdenes Demoradas</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {ordenesDemoradas.map((wo) => (
+                    <li key={wo.id} className="flex items-center justify-between gap-3 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-carbon-100">{wo.vehicle.patente} — {wo.client.nombre}</p>
+                        <p className="truncate text-xs text-red-400">{daysSince(wo.fecha)} días sin avanzar · {STATUS_LABELS[wo.status]}</p>
+                      </div>
+                      <Link href={`/work-orders/${wo.id}`} className="shrink-0 text-xs font-medium text-brand-400 hover:text-brand-300">Ver orden</Link>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Gráfico ingresos/egresos */}
           <Card>
             <CardHeader>
@@ -376,7 +588,24 @@ function DashboardContent() {
             </CardContent>
           </Card>
 
-          {/* Próximos turnos */}
+          {/* Dinero pendiente */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Dinero Pendiente de Cobro</CardTitle>
+              <Link href="/debts" className="text-xs text-brand-400 hover:underline">Ver deudas</Link>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <Skeleton className="h-10 w-full" />
+              ) : (
+                <p className={`text-2xl font-bold ${stats!.deudasPendientes > 0 ? "text-amber-400" : "text-emerald-400"}`}>
+                  {formatCurrency(stats!.deudasPendientes)}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Próximos turnos (después de hoy) */}
           <Card>
             <CardHeader>
               <CardTitle>Próximos Turnos</CardTitle>
@@ -444,6 +673,14 @@ function DashboardContent() {
               </Link>
             </CardHeader>
             <CardContent>
+              {lastVisit !== undefined && lastVisit !== null && (
+                <div className="mb-3 flex items-center gap-1.5 border-b border-carbon-700 pb-3 text-xs text-carbon-500">
+                  <History className="h-3.5 w-3.5" />
+                  {activitySinceLastVisit.length > 0
+                    ? `${activitySinceLastVisit.length} evento${activitySinceLastVisit.length > 1 ? "s" : ""} desde tu última visita`
+                    : "Sin novedades desde tu última visita"}
+                </div>
+              )}
               {activity === null ? (
                 <Skeleton className="h-24 w-full" />
               ) : recentActivity.length === 0 ? (

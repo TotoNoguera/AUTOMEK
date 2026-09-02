@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Plus, CalendarDays, Eye } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, CalendarDays, Eye, Check, MessageCircle } from "lucide-react";
 import { useToast } from "@/components/common/ToastProvider";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { cn } from "@/lib/utils";
+import { buildWhatsAppLink, whatsAppConfirmTurno } from "@/lib/whatsapp";
 
 interface Schedule {
   id: string;
@@ -22,7 +23,7 @@ interface Schedule {
   motivo: string;
   status: "PENDIENTE" | "CONFIRMADO" | "EN_ESPERA" | "CANCELADO" | "COMPLETADO";
   workOrderId: string | null;
-  client: { id: string; nombre: string };
+  client: { id: string; nombre: string; telefono?: string };
   vehicle: { id: string; patente: string };
 }
 
@@ -194,6 +195,32 @@ export default function SchedulesPage() {
       }
     } catch (error) {
       showToast("Error creando turno", "error");
+    }
+  }
+
+  async function confirmSchedule(s: Schedule) {
+    try {
+      const response = await fetch(`/api/schedules/${s.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId: s.client.id,
+          vehicleId: s.vehicle.id,
+          fecha: s.fecha.split("T")[0],
+          hora: s.hora,
+          motivo: s.motivo,
+          status: "CONFIRMADO",
+        }),
+      });
+      if (response.ok) {
+        showToast("Turno confirmado", "success");
+        loadSchedules();
+      } else {
+        const error = await response.json();
+        showToast(`Error: ${error.error}`, "error");
+      }
+    } catch (error) {
+      showToast("Error confirmando turno", "error");
     }
   }
 
@@ -388,7 +415,27 @@ export default function SchedulesPage() {
                   <Badge variant={STATUS_VARIANT[s.status]}>{STATUS_LABELS[s.status]}</Badge>
                 </Td>
                 <Td>
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-3">
+                    {s.status === "PENDIENTE" && (
+                      <>
+                        <button
+                          onClick={() => confirmSchedule(s)}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 hover:text-emerald-300"
+                        >
+                          <Check className="h-3.5 w-3.5" /> Confirmar
+                        </button>
+                        {buildWhatsAppLink(s.client.telefono, whatsAppConfirmTurno(s.client.nombre, new Date(`${s.fecha.slice(0, 10)}T00:00:00`).toLocaleDateString("es-AR"), s.hora, s.motivo)) && (
+                          <a
+                            href={buildWhatsAppLink(s.client.telefono, whatsAppConfirmTurno(s.client.nombre, new Date(`${s.fecha.slice(0, 10)}T00:00:00`).toLocaleDateString("es-AR"), s.hora, s.motivo))!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400 hover:text-emerald-300"
+                          >
+                            <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                          </a>
+                        )}
+                      </>
+                    )}
                     <Link href={`/schedules/${s.id}`} className="inline-flex items-center gap-1 text-xs font-medium text-brand-400 hover:text-brand-300">
                       <Eye className="h-3.5 w-3.5" /> Ver
                     </Link>

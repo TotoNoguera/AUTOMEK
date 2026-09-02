@@ -13,6 +13,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
 import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
+import { StatCard } from "@/components/common/StatCard";
 
 interface PaymentMethod {
   id: string;
@@ -85,6 +86,26 @@ export default function CashMovementsPage() {
   const [egresoMonto, setEgresoMonto] = useState("");
   const [egresoDescripcion, setEgresoDescripcion] = useState("");
 
+  const [todaySummary, setTodaySummary] = useState<{ saldoInicial: number; ingresos: number; egresos: number } | null>(null);
+
+  const loadTodaySummary = useCallback(async () => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const url = new URL("/api/cash-movements", window.location.origin);
+      url.searchParams.set("from", today);
+      url.searchParams.set("to", today);
+      const [movsRes, closesRes] = await Promise.all([fetch(url), fetch("/api/daily-closes")]);
+      const todayMovs: CashMovement[] = movsRes.ok ? await movsRes.json() : [];
+      const closes = closesRes.ok ? await closesRes.json() : [];
+      const saldoInicial = closes.length > 0 ? closes[0].saldoFinal : 0;
+      const ingresos = todayMovs.filter((m) => m.tipo === "INGRESO").reduce((s, m) => s + m.monto, 0);
+      const egresos = todayMovs.filter((m) => m.tipo === "EGRESO").reduce((s, m) => s + m.monto, 0);
+      setTodaySummary({ saldoInicial, ingresos, egresos });
+    } catch (error) {
+      console.error("Error loading today's cash summary:", error);
+    }
+  }, []);
+
   const loadMovements = useCallback(async () => {
     try {
       setLoading(true);
@@ -104,6 +125,10 @@ export default function CashMovementsPage() {
   useEffect(() => {
     loadMovements();
   }, [loadMovements]);
+
+  useEffect(() => {
+    loadTodaySummary();
+  }, [loadTodaySummary]);
 
   useEffect(() => {
     async function loadInitial() {
@@ -149,6 +174,7 @@ export default function CashMovementsPage() {
         setShowIngreso(false);
         showToast("Ingreso registrado correctamente", "success");
         loadMovements();
+        loadTodaySummary();
       } else {
         const error = await response.json();
         showToast(`Error: ${error.error}`, "error");
@@ -177,6 +203,7 @@ export default function CashMovementsPage() {
         setShowEgreso(false);
         showToast("Egreso registrado correctamente", "success");
         loadMovements();
+        loadTodaySummary();
       } else {
         const error = await response.json();
         showToast(`Error: ${error.error}`, "error");
@@ -218,6 +245,19 @@ export default function CashMovementsPage() {
           </>
         }
       />
+
+      {todaySummary && (
+        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+          <StatCard label="Saldo Inicial (hoy)" value={`$${todaySummary.saldoInicial.toFixed(2)}`} tone="neutral" />
+          <StatCard label="Ingresos de Hoy" value={`$${todaySummary.ingresos.toFixed(2)}`} tone="success" />
+          <StatCard label="Egresos de Hoy" value={`$${todaySummary.egresos.toFixed(2)}`} tone="danger" />
+          <StatCard
+            label="Saldo Actual"
+            value={`$${(todaySummary.saldoInicial + todaySummary.ingresos - todaySummary.egresos).toFixed(2)}`}
+            tone="brand"
+          />
+        </div>
+      )}
 
       <Modal open={showIngreso} onClose={() => setShowIngreso(false)} title="Registrar Ingreso">
         <form onSubmit={handleIngresoSubmit} className="space-y-4">
