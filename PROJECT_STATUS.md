@@ -1,8 +1,89 @@
-# Estado del Proyecto — Fase 9 EN PROGRESO: Preparación para Producción (Dev ✅ | Build ✅ | Tests ✅)
+# Estado del Proyecto — CHECKPOINT (Fase 9: revisión final de pre-entrega COMPLETADA, pendiente decisión de deploy/limpieza DEMO)
 
-**Fecha**: 2026-09-02  
-**Status**: ✅ Fase 8 cerrada. 🔄 Fase 9 (Preparación para Producción) — revisión de seguridad, configuración, base de datos y aplicación completa; **falta el deploy real en Vercel** (requiere credenciales/cuentas del usuario, fuera del alcance de este agente)  
-**Próxima Fase**: Completar el deploy en Vercel (acción del usuario) — no hay Fase 10 planificada en ROADMAP.md
+**Fecha del checkpoint**: 2026-09-02
+
+## Fase actual
+Fase 9 — Preparación para Producción. Código completo y desplegado. **Deploy real ya realizado** (esto ya ocurrió, a diferencia de lo que decía el checkpoint anterior de esta misma fase).
+
+## Funcionalidades completadas
+- Fases 1–8: sistema completo (auth, aislamiento multi-taller, clientes/vehículos/presupuestos/órdenes/agenda/caja/costos/reportes P&L/CSV/PDF), verificado exhaustivamente en sesiones previas.
+- Fase 9 (código): middleware corregido para proteger las 14 rutas reales, `poweredByHeader: false`, `NEXTAUTH_SECRET` de desarrollo regenerado (placeholder eliminado), `.env.example` mejorado, `app/error.tsx` y `app/not-found.tsx` agregados, migración baseline de Prisma creada (`prisma/migrations/20260902010415_init`) y marcada como aplicada, scripts `postinstall`/`db:migrate:deploy` agregados a `package.json`.
+- Repositorio Git: inicializado, commit único `5b32751` ("feat: initial workshop management system"), pusheado a `https://github.com/TotoNoguera/AUTOMEK.git` (rama `master`). **Working tree limpio, sin cambios pendientes de commitear.**
+
+## Estado de producción
+- **Desplegado en Vercel**, URL: `https://automek-one.vercel.app`
+- Smoke test de producción (12 pruebas: carga inicial, login, sesión persistente, logout, acceso protegido, clientes, vehículos, presupuestos, órdenes, turnos, caja/cobros, reportes) — **todas ✅**, sin errores encontrados.
+- Se cargó un **dataset DEMO completo** en la base de producción para dejar la app con datos realistas (ver abajo).
+
+## Datos DEMO existentes en producción (deberán eliminarse antes de la entrega real al cliente)
+- 1 usuario/taller de prueba: `smoketest.automek@example.com` / taller "Taller Smoke Test", con 1 cliente ("Cliente Smoke Test"), 1 vehículo (SMK001), 1 presupuesto, 1 orden, 1 turno, 1 movimiento de caja — creado durante el smoke test inicial.
+- 10 clientes `DEMO Cliente 01-10` con 15 vehículos (patentes `DEMO101`...`DEMO1002`).
+- 8 turnos DEMO (estados variados: Pendiente, Confirmado, En Espera, Cancelado, Completado).
+- 8 presupuestos DEMO (Pendiente, Aprobado, Rechazado; $300–$2000).
+- 9 órdenes de trabajo DEMO (Aprobada, En Proceso, Terminada, Entregada; incluye 2 generadas por conversión turno→orden y presupuesto→orden).
+- 2 técnicos DEMO, 2 objetivos DEMO (Ingreso Mensual, Órdenes Mensuales).
+- Movimientos de caja DEMO (pagos, pago parcial, egresos) y 1 cierre de caja DEMO.
+- 5 costos DEMO distribuidos en Mayo–Septiembre 2026 (para poblar el historial de P&L).
+- Todo está prefijado o etiquetado claramente como "DEMO" / "Smoke Test" para poder identificarlo y borrarlo fácilmente. **No se debe borrar todavía** (instrucción explícita del usuario).
+
+## Problemas pendientes
+- **La revisión final de pre-entrega (10 puntos pedida por el usuario) fue interrumpida antes de ejecutarse**: navegación/enlaces, responsive, estados vacíos/errores, permisos/rutas protegidas, secretos expuestos, configuración de producción de Vercel/Neon, `npm run build`. Ninguno de estos 10 puntos se verificó todavía en esta sesión (sí se verificó código y build en la sesión anterior de Fase 9, antes del deploy, pero no se re-confirmó post-deploy).
+- No se ha confirmado si `NEXTAUTH_SECRET` y `DATABASE_URL` configurados en el dashboard de Vercel son los correctos/seguros (esto se documentó como pendiente de acción del usuario en la sesión anterior; no verificado desde el lado de la app en producción).
+- Los datos DEMO siguen en la base de producción (ver arriba) — pendientes de borrado antes de la entrega real, cuando el usuario lo indique.
+
+## Próximo paso exacto
+Retomar y ejecutar la revisión final de pre-entrega de 10 puntos que el usuario pidió y quedó interrumpida:
+1. Navegación y enlaces principales
+2. Responsive
+3. Estados vacíos y mensajes de error
+4. Permisos y rutas protegidas
+5. Secretos expuestos
+6. Configuración de producción de Vercel y Neon
+7. `npm run build`
+8. No modificar funcionalidades cerradas
+9. No tocar otros proyectos
+10. No borrar datos DEMO todavía
+
+Al finalizar esa revisión, entregar: problemas encontrados, problemas corregidos, estado de producción, build ✅/❌, lista de datos DEMO a eliminar, y confirmación de si AUTOMEK está listo para prueba final con la cuenta real del cliente — tal como pidió el usuario originalmente.
+
+## Contexto para continuar en un chat nuevo
+- Proyecto local: `C:\Users\tomin\OneDrive\Escritorio\Taller-gestion` (Next.js 15 + Prisma + NextAuth v5 + PostgreSQL/Neon).
+- Producción: `https://automek-one.vercel.app` (Vercel), repo GitHub: `https://github.com/TotoNoguera/AUTOMEK.git`.
+- Mantener Taller Mecánico/AUTOMEK en el puerto 3002 si se prueba en local; nunca tocar el proyecto "Wpp" (Wapa Pizza Party) que puede correr en el puerto 3000 en la misma máquina.
+- `.env`/`.env.local` locales tienen secretos de desarrollo (no reutilizar en producción); Vercel tiene sus propias variables de entorno configuradas por el usuario.
+- Git: working tree limpio, un solo commit pusheado a `origin/master`. Cualquier cambio de código nuevo requeriría un nuevo commit (no hay identidad global de Git configurada en esta máquina; se configuró solo local para el repo).
+
+---
+
+## FASE 9 — REVISIÓN FINAL DE PRE-ENTREGA (sesión 2026-09-02, retomada)
+
+Ejecución de los 10 puntos pedidos, contra código local y contra producción (`https://automek-one.vercel.app`), con sesión real de `smoketest.automek@example.com`. No se hizo push ni deploy (según instrucción explícita).
+
+1. ✅ **Navegación y enlaces principales**: las 13 tarjetas de acceso rápido del dashboard (`/clients`, `/vehicles`, `/quotes`, `/work-orders`, `/schedules`, `/cash-movements`, `/daily-closes`, `/debts`, `/technicians`, `/goals`, `/audit-logs`, `/reports/monthly`, `/costs`, `/reports/pnl`) verificadas una por una en producción — todas cargan (200), sin errores de consola.
+2. ✅ **Responsive**: verificado en viewport móvil (375px) sobre `/dashboard` (KPIs y gráficos en 1 columna, sin overflow) y `/debts` (tabla ancha con scroll horizontal contenido dentro de su propio contenedor, estado vacío "No hay clientes con saldo negativo" legible).
+3. ✅ **Estados vacíos y mensajes de error**: confirmado estado vacío en `/debts` → "Clientes con Saldo Negativo"; página 404 propia (`app/not-found.tsx`) responde correctamente a una ruta inexistente sin exponer stack trace ni detalles internos.
+4. ✅ **Permisos y rutas protegidas**: fetch sin cookies de sesión (`credentials: 'omit'`) contra `/dashboard`, `/clients`, `/costs`, `/reports/pnl`, `/audit-logs` → las 5 redirigen a `/auth/login`; `/api/clients` y `/api/dashboard/stats` sin sesión → `401` en ambos. Middleware con las 14 rutas protegidas confirmado en código.
+5. ✅ **Secretos expuestos**: `.env`/`.env.local` confirmados ignorados por Git (`git check-ignore`); sin ocurrencias de `NEXTAUTH_SECRET`/connection strings/API keys hardcodeadas en `app/`; header `X-Powered-By` ausente en producción (`poweredByHeader: false` activo); 404 de producción no incluye stack trace.
+6. ✅ **Configuración de producción de Vercel y Neon**: `.env.example` documentado con formato Neon pooled + `sslmode=require` y nota de generar `NEXTAUTH_SECRET` propio; producción responde correctamente (dashboard con datos reales de Neon), confirmando que `DATABASE_URL`/`NEXTAUTH_SECRET`/`NEXTAUTH_URL` están configurados y funcionando en el dashboard de Vercel (no accesible desde este entorno para inspeccionar los valores en sí, solo su efecto observable).
+7. ✅ **`npm run build`**: exit code 0, todas las páginas y endpoints generados correctamente, solo warnings preexistentes de ESLint (no bloqueantes, no introducidos en esta sesión).
+8. ✅ **No modificar funcionalidades cerradas**: único cambio de código fue eliminar un bloque de texto (ver "Problema encontrado y corregido" abajo); no se tocó lógica de negocio, rutas de API, ni esquema de base de datos.
+9. ✅ **No tocar otros proyectos**: no se accedió ni modificó el proyecto "Wpp" (Wapa Pizza Party) en ningún momento.
+10. ✅ **No borrar datos DEMO todavía**: no se ejecutó ningún borrado; los datos DEMO siguen intactos en producción.
+
+### Problema encontrado y corregido
+- 🔧 **Banner de estado de desarrollo visible en el dashboard de producción**: `app/dashboard/page.tsx` mostraba, sin condición, un bloque "✅ Fase 1 completada... / ✅ Fase 2 en desarrollo: Gestión de clientes y vehículos" — texto de debug interno, y además desactualizado (el proyecto ya está en Fase 9), visible para cualquier usuario logueado, incluido el cliente final. Se eliminó el bloque completo (y el comentario `Quick Links - Fase 2, 3, 4, 5 y 6` que lo acompañaba, dejado como `Quick Links`). No se encontraron menciones similares en el resto de `app/` (`grep "Fase [0-9]"` → solo ese archivo). **Este cambio está solo en el working tree local, no deployado.**
+
+### Archivos modificados en esta sesión
+- `app/dashboard/page.tsx` — eliminado banner de estado de desarrollo (10 líneas removidas, sin cambios funcionales).
+- `PROJECT_STATUS.md` — este registro.
+
+### Build
+✅ `npm run build` — exit code 0.
+
+### Estado de AUTOMEK para el deploy final
+- Código: los 10 puntos de la revisión de pre-entrega están **verificados y aprobados**, con un único hallazgo (banner de fase visible) ya corregido localmente.
+- **Pendiente antes de dar por cerrada la entrega**: deployar el fix del dashboard (commit + push + Vercel), y decidir cuándo borrar los datos DEMO de producción (instrucción explícita: no borrar todavía).
+- No se hizo push ni deploy en esta sesión, según lo pedido.
 
 ---
 

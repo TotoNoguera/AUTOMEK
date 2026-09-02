@@ -232,17 +232,7 @@ function DashboardContent() {
             </>
           )}
 
-          {/* Phase Status */}
-          <div className="bg-blue-50 p-4 rounded-md border border-blue-200 mb-8">
-            <p className="text-sm text-blue-700">
-              ✅ Fase 1 completada: Registro, login, dashboard protegido
-            </p>
-            <p className="text-sm text-green-700 mt-2">
-              ✅ Fase 2 en desarrollo: Gestión de clientes y vehículos
-            </p>
-          </div>
-
-          {/* Quick Links - Fase 2, 3, 4, 5 y 6 */}
+          {/* Quick Links */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
             <Link
               href="/clients"
