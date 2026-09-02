@@ -3,7 +3,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { ArrowLeft, Printer, Pencil, Trash2, Plus } from "lucide-react";
 import { useToast } from "@/components/common/ToastProvider";
+import { AppShell } from "@/components/layout/AppShell";
+import { Card, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input, Textarea } from "@/components/ui/Input";
+import { Badge } from "@/components/ui/Badge";
+import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
+import { Skeleton } from "@/components/ui/EmptyState";
+import { cn } from "@/lib/utils";
 
 interface WorkOrderItem {
   id: string;
@@ -37,12 +46,12 @@ const STATUS_LABELS: Record<string, string> = {
   ENTREGADA: "Entregada",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  PRESUPUESTA: "bg-gray-100 text-gray-800",
-  APROBADA: "bg-blue-100 text-blue-800",
-  EN_PROCESO: "bg-yellow-100 text-yellow-800",
-  TERMINADA: "bg-green-100 text-green-800",
-  ENTREGADA: "bg-purple-100 text-purple-800",
+const STATUS_VARIANT: Record<string, "neutral" | "info" | "warning" | "success" | "brand"> = {
+  PRESUPUESTA: "neutral",
+  APROBADA: "info",
+  EN_PROCESO: "warning",
+  TERMINADA: "success",
+  ENTREGADA: "brand",
 };
 
 const STATUS_ORDER = ["PRESUPUESTA", "APROBADA", "EN_PROCESO", "TERMINADA", "ENTREGADA"];
@@ -194,273 +203,211 @@ export default function WorkOrderDetailPage() {
     }
   }
 
-  if (loading) return <div className="text-center py-12">Cargando...</div>;
-  if (notFound || !workOrder)
-    return <div className="text-center py-12">Orden de trabajo no encontrada</div>;
-
-  const currentIndex = STATUS_ORDER.indexOf(workOrder.status);
+  const currentIndex = workOrder ? STATUS_ORDER.indexOf(workOrder.status) : -1;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="no-print flex justify-between items-center mb-6">
-          <Link href="/work-orders" className="text-blue-600 hover:text-blue-800 inline-block">
-            ← Volver a Órdenes de Trabajo
-          </Link>
-          <button
-            onClick={() => window.print()}
-            className="px-3 py-1 text-sm bg-gray-700 text-white rounded hover:bg-gray-800"
-          >
-            Imprimir / PDF
-          </button>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Orden #{workOrder.id.slice(-6)}
-              </h1>
-              <p className="text-gray-600 text-sm">
-                {new Date(workOrder.fecha).toLocaleDateString()}
-              </p>
-            </div>
-            <span
-              className={`px-3 py-1 rounded-full text-sm font-medium ${STATUS_COLORS[workOrder.status]}`}
-            >
-              {STATUS_LABELS[workOrder.status]}
-            </span>
+    <AppShell>
+      {loading ? (
+        <Skeleton className="h-64 w-full" />
+      ) : notFound || !workOrder ? (
+        <p className="text-sm text-carbon-400">Orden de trabajo no encontrada</p>
+      ) : (
+        <>
+          <div className="no-print mb-6 flex items-center justify-between">
+            <Link href="/work-orders" className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-400 hover:text-brand-300">
+              <ArrowLeft className="h-4 w-4" /> Volver a Órdenes de Trabajo
+            </Link>
+            <Button variant="secondary" onClick={() => window.print()}>
+              <Printer className="h-4 w-4" /> Imprimir / PDF
+            </Button>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <span className="text-gray-600 text-sm">Cliente:</span>
-              <p className="text-gray-900 font-medium">{workOrder.client.nombre}</p>
-            </div>
-            <div>
-              <span className="text-gray-600 text-sm">Vehículo:</span>
-              <p className="text-gray-900 font-medium">
-                {workOrder.vehicle.patente} - {workOrder.vehicle.marca} {workOrder.vehicle.modelo}
-              </p>
-            </div>
-          </div>
-
-          <div className="no-print flex gap-2 mb-4 flex-wrap">
-            {STATUS_ORDER.map((status, index) => (
-              <button
-                key={status}
-                onClick={() => changeStatus(status)}
-                disabled={index <= currentIndex}
-                className={`px-3 py-1 text-sm rounded disabled:opacity-40 ${STATUS_COLORS[status]} hover:opacity-80`}
-              >
-                {STATUS_LABELS[status]}
-              </button>
-            ))}
-          </div>
-
-          {editing ? (
-            <form onSubmit={handleSaveEdit} className="border-t pt-4">
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <input
-                  type="text"
-                  placeholder="Motivo de ingreso *"
-                  value={motivoIngreso}
-                  onChange={(e) => setMotivoIngreso(e.target.value)}
-                  className="border rounded px-3 py-2"
-                  required
-                />
-                <input
-                  type="number"
-                  placeholder="Km ingreso"
-                  value={kmIngreso}
-                  onChange={(e) => setKmIngreso(e.target.value)}
-                  className="border rounded px-3 py-2"
-                />
-                <input
-                  type="number"
-                  placeholder="Km egreso"
-                  value={kmEgreso}
-                  onChange={(e) => setKmEgreso(e.target.value)}
-                  className="border rounded px-3 py-2"
-                />
-              </div>
-              <textarea
-                placeholder="Diagnóstico"
-                value={diagnostico}
-                onChange={(e) => setDiagnostico(e.target.value)}
-                className="w-full border rounded px-3 py-2 mb-4"
-                rows={2}
-              />
-              <textarea
-                placeholder="Observaciones"
-                value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-                className="w-full border rounded px-3 py-2 mb-4"
-                rows={2}
-              />
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                >
-                  Guardar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditing(false)}
-                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </form>
-          ) : (
-            <div className="border-t pt-4">
-              <div className="grid grid-cols-2 gap-4 mb-2">
+          <Card className="mb-8">
+            <CardContent>
+              <div className="mb-4 flex items-start justify-between">
                 <div>
-                  <span className="text-gray-600 text-sm">Motivo de ingreso:</span>
-                  <p className="text-gray-900">{workOrder.motivoIngreso}</p>
+                  <h1 className="text-xl font-bold text-white">Orden #{workOrder.id.slice(-6)}</h1>
+                  <p className="text-sm text-carbon-400">{new Date(workOrder.fecha).toLocaleDateString()}</p>
+                </div>
+                <Badge variant={STATUS_VARIANT[workOrder.status]}>{STATUS_LABELS[workOrder.status]}</Badge>
+              </div>
+
+              <div className="mb-4 grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-xs text-carbon-400">Cliente</span>
+                  <p className="font-medium text-carbon-100">{workOrder.client.nombre}</p>
                 </div>
                 <div>
-                  <span className="text-gray-600 text-sm">Km ingreso / egreso:</span>
-                  <p className="text-gray-900">
-                    {workOrder.kmIngreso ?? "-"} / {workOrder.kmEgreso ?? "-"}
+                  <span className="text-xs text-carbon-400">Vehículo</span>
+                  <p className="font-medium text-carbon-100">
+                    {workOrder.vehicle.patente} - {workOrder.vehicle.marca} {workOrder.vehicle.modelo}
                   </p>
                 </div>
               </div>
-              {workOrder.diagnostico && (
-                <div className="mb-2">
-                  <span className="text-gray-600 text-sm">Diagnóstico:</span>
-                  <p className="text-gray-900">{workOrder.diagnostico}</p>
+
+              <div className="no-print mb-4 flex flex-wrap gap-2">
+                {STATUS_ORDER.map((status, index) => (
+                  <button
+                    key={status}
+                    onClick={() => changeStatus(status)}
+                    disabled={index <= currentIndex}
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:opacity-40",
+                      index === currentIndex
+                        ? "border-brand-500/40 bg-brand-500/10 text-brand-400"
+                        : "border-carbon-600 text-carbon-300 hover:bg-carbon-800 hover:text-white"
+                    )}
+                  >
+                    {STATUS_LABELS[status]}
+                  </button>
+                ))}
+              </div>
+
+              {editing ? (
+                <form onSubmit={handleSaveEdit} className="space-y-4 border-t border-carbon-700 pt-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input type="text" placeholder="Motivo de ingreso *" value={motivoIngreso} onChange={(e) => setMotivoIngreso(e.target.value)} required className="col-span-2" />
+                    <Input type="number" placeholder="Km ingreso" value={kmIngreso} onChange={(e) => setKmIngreso(e.target.value)} />
+                    <Input type="number" placeholder="Km egreso" value={kmEgreso} onChange={(e) => setKmEgreso(e.target.value)} />
+                  </div>
+                  <Textarea placeholder="Diagnóstico" value={diagnostico} onChange={(e) => setDiagnostico(e.target.value)} rows={2} />
+                  <Textarea placeholder="Observaciones" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} rows={2} />
+                  <div className="flex gap-2">
+                    <Button type="submit" variant="success">Guardar</Button>
+                    <Button type="button" variant="secondary" onClick={() => setEditing(false)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <div className="border-t border-carbon-700 pt-4">
+                  <div className="mb-2 grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-xs text-carbon-400">Motivo de ingreso</span>
+                      <p className="text-carbon-100">{workOrder.motivoIngreso}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-carbon-400">Km ingreso / egreso</span>
+                      <p className="text-carbon-100">{workOrder.kmIngreso ?? "-"} / {workOrder.kmEgreso ?? "-"}</p>
+                    </div>
+                  </div>
+                  {workOrder.diagnostico && (
+                    <div className="mb-2">
+                      <span className="text-xs text-carbon-400">Diagnóstico</span>
+                      <p className="text-carbon-100">{workOrder.diagnostico}</p>
+                    </div>
+                  )}
+                  {workOrder.observaciones && (
+                    <div className="mb-2">
+                      <span className="text-xs text-carbon-400">Observaciones</span>
+                      <p className="text-carbon-100">{workOrder.observaciones}</p>
+                    </div>
+                  )}
+                  <Button variant="secondary" className="mt-2" onClick={() => setEditing(true)}>
+                    <Pencil className="h-4 w-4" /> Editar Orden
+                  </Button>
                 </div>
               )}
-              {workOrder.observaciones && (
-                <div className="mb-2">
-                  <span className="text-gray-600 text-sm">Observaciones:</span>
-                  <p className="text-gray-900">{workOrder.observaciones}</p>
-                </div>
-              )}
-              <button
-                onClick={() => setEditing(true)}
-                className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Editar Orden
-              </button>
-            </div>
-          )}
-        </div>
+            </CardContent>
+          </Card>
 
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Trabajos Realizados</h2>
+          <h2 className="mb-4 text-lg font-semibold text-white">Trabajos Realizados</h2>
 
-        <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-          <table className="w-full">
-            <thead className="bg-gray-100 border-b">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                  Descripción
-                </th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                  Cantidad
-                </th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                  Precio Unit.
-                </th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                  Subtotal
-                </th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {workOrder.items.map((item) => (
-                <tr key={item.id} className="border-b">
-                  <td className="px-6 py-4 text-sm text-gray-900">
-                    {item.descripcion}
+          <Card className="mb-6">
+            <Table>
+              <Thead>
+                <tr>
+                  <Th>Descripción</Th>
+                  <Th>Cantidad</Th>
+                  <Th>Precio Unit.</Th>
+                  <Th>Subtotal</Th>
+                  <Th className="text-right">Acciones</Th>
+                </tr>
+              </Thead>
+              <Tbody>
+                {workOrder.items.map((item) => (
+                  <Tr key={item.id}>
+                    <Td>{item.descripcion}</Td>
+                    <Td className="text-carbon-400">{item.cantidad}</Td>
+                    <Td className="text-carbon-400">${item.precioUnitario.toFixed(2)}</Td>
+                    <Td className="font-medium">${item.subtotal.toFixed(2)}</Td>
+                    <Td>
+                      <div className="flex justify-end">
+                        <button
+                          onClick={() => removeItem(item.id)}
+                          disabled={workOrder.items.length === 1}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-red-400 hover:text-red-300 disabled:opacity-30"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Quitar
+                        </button>
+                      </div>
+                    </Td>
+                  </Tr>
+                ))}
+              </Tbody>
+              <tfoot>
+                <tr className="bg-carbon-800/60">
+                  <td colSpan={3} className="px-4 py-3 text-right font-bold text-white">
+                    Total:
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {item.cantidad}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    ${item.precioUnitario.toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900 font-medium">
-                    ${item.subtotal.toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      disabled={workOrder.items.length === 1}
-                      className="text-red-600 hover:text-red-800 disabled:opacity-30"
-                    >
-                      Quitar
-                    </button>
+                  <td colSpan={2} className="px-4 py-3 font-bold text-white">
+                    ${workOrder.total.toFixed(2)}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="bg-gray-50">
-                <td colSpan={3} className="px-6 py-4 text-right font-bold text-gray-900">
-                  Total:
-                </td>
-                <td colSpan={2} className="px-6 py-4 font-bold text-gray-900">
-                  ${workOrder.total.toFixed(2)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+              </tfoot>
+            </Table>
+          </Card>
 
-        {workOrder.margen !== undefined && (
-          <div className="no-print bg-white p-4 rounded-lg shadow mb-8 flex justify-between items-center">
-            <span className="text-sm text-gray-600">Margen (ingresos - costos asociados):</span>
-            <span className={`font-bold ${workOrder.margen >= 0 ? "text-green-700" : "text-red-700"}`}>
-              ${workOrder.margen.toFixed(2)}
-            </span>
-          </div>
-        )}
+          {workOrder.margen !== undefined && (
+            <Card className="no-print mb-8">
+              <CardContent className="flex items-center justify-between">
+                <span className="text-sm text-carbon-400">Margen (ingresos - costos asociados)</span>
+                <span className={`font-bold ${workOrder.margen >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                  ${workOrder.margen.toFixed(2)}
+                </span>
+              </CardContent>
+            </Card>
+          )}
 
-        <form onSubmit={addItem} className="bg-white p-6 rounded-lg shadow-md">
-          <h3 className="font-medium text-gray-900 mb-2">Agregar Trabajo</h3>
-          <div className="grid grid-cols-12 gap-2">
-            <input
-              type="text"
-              placeholder="Descripción *"
-              value={newItemDesc}
-              onChange={(e) => setNewItemDesc(e.target.value)}
-              className="col-span-6 border rounded px-3 py-2"
-              required
-            />
-            <input
-              type="number"
-              placeholder="Cant."
-              min="1"
-              value={newItemCant}
-              onChange={(e) => setNewItemCant(parseInt(e.target.value) || 1)}
-              className="col-span-2 border rounded px-3 py-2"
-              required
-            />
-            <input
-              type="number"
-              placeholder="Precio Unit."
-              min="0"
-              step="0.01"
-              value={newItemPrecio}
-              onChange={(e) => setNewItemPrecio(parseFloat(e.target.value) || 0)}
-              className="col-span-3 border rounded px-3 py-2"
-              required
-            />
-            <button
-              type="submit"
-              className="col-span-1 bg-green-600 text-white rounded hover:bg-green-700"
-            >
-              +
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          <Card>
+            <CardContent>
+              <h3 className="mb-3 font-semibold text-white">Agregar Trabajo</h3>
+              <form onSubmit={addItem} className="grid grid-cols-12 gap-2">
+                <Input
+                  type="text"
+                  placeholder="Descripción *"
+                  value={newItemDesc}
+                  onChange={(e) => setNewItemDesc(e.target.value)}
+                  className="col-span-12 sm:col-span-6"
+                  required
+                />
+                <Input
+                  type="number"
+                  placeholder="Cant."
+                  min="1"
+                  value={newItemCant}
+                  onChange={(e) => setNewItemCant(parseInt(e.target.value) || 1)}
+                  className="col-span-4 sm:col-span-2"
+                  required
+                />
+                <Input
+                  type="number"
+                  placeholder="Precio Unit."
+                  min="0"
+                  step="0.01"
+                  value={newItemPrecio}
+                  onChange={(e) => setNewItemPrecio(parseFloat(e.target.value) || 0)}
+                  className="col-span-6 sm:col-span-3"
+                  required
+                />
+                <Button type="submit" className="col-span-2 sm:col-span-1 px-0">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </AppShell>
   );
 }

@@ -1,7 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Plus, Receipt, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/components/common/ToastProvider";
+import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader } from "@/components/common/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input, Select } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
+import { Badge } from "@/components/ui/Badge";
+import { StatCard } from "@/components/common/StatCard";
+import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
+import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
 
 interface Cost {
   id: string;
@@ -145,39 +156,36 @@ export default function CostsPage() {
   const totalVariables = costs.filter((c) => c.tipo === "VARIABLE").reduce((s, c) => s + c.monto, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Costos</h1>
-          <button
+    <AppShell>
+      <PageHeader
+        title="Costos"
+        description="Costos fijos y variables por período"
+        actions={
+          <Button
             onClick={() => {
               resetForm();
-              setShowForm(!showForm);
+              setShowForm(true);
             }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
           >
-            {showForm ? "Cancelar" : "+ Nuevo Costo"}
-          </button>
-        </div>
+            <Plus className="h-4 w-4" /> Nuevo Costo
+          </Button>
+        }
+      />
 
-        {showForm && (
-          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md mb-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-              <select
-                value={tipo}
-                onChange={(e) => setTipo(e.target.value as "FIJO" | "VARIABLE")}
-                className="border rounded px-3 py-2"
-              >
-                <option value="FIJO">Fijo</option>
-                <option value="VARIABLE">Variable</option>
-              </select>
-              <input
+      <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? "Editar Costo" : "Nuevo Costo"}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Select value={tipo} onChange={(e) => setTipo(e.target.value as "FIJO" | "VARIABLE")}>
+              <option value="FIJO">Fijo</option>
+              <option value="VARIABLE">Variable</option>
+            </Select>
+            <div>
+              <Input
                 type="text"
                 list="categorias-sugeridas"
                 placeholder="Categoría *"
                 value={categoria}
                 onChange={(e) => setCategoria(e.target.value)}
-                className="border rounded px-3 py-2"
                 required
               />
               <datalist id="categorias-sugeridas">
@@ -186,127 +194,89 @@ export default function CostsPage() {
                 ))}
               </datalist>
             </div>
-            <input
-              type="text"
-              placeholder="Descripción *"
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              className="w-full border rounded px-3 py-2 mb-4"
-              required
-            />
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-              <input
-                type="number"
-                placeholder="Monto *"
-                min="0.01"
-                step="0.01"
-                value={monto}
-                onChange={(e) => setMonto(e.target.value)}
-                className="border rounded px-3 py-2"
-                required
-              />
-              <select
-                value={mes}
-                onChange={(e) => setMes(parseInt(e.target.value))}
-                className="border rounded px-3 py-2"
-              >
-                {MESES.map((m, i) => (
-                  <option key={i + 1} value={i + 1}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                placeholder="Año"
-                value={anio}
-                onChange={(e) => setAnio(parseInt(e.target.value))}
-                className="border rounded px-3 py-2"
-              />
-            </div>
-            <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
-              {editingId ? "Actualizar Costo" : "Registrar Costo"}
-            </button>
-          </form>
-        )}
+          </div>
+          <Input type="text" placeholder="Descripción *" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} required />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Input type="number" placeholder="Monto *" min="0.01" step="0.01" value={monto} onChange={(e) => setMonto(e.target.value)} required />
+            <Select value={mes} onChange={(e) => setMes(parseInt(e.target.value))}>
+              {MESES.map((m, i) => (
+                <option key={i + 1} value={i + 1}>
+                  {m}
+                </option>
+              ))}
+            </Select>
+            <Input type="number" placeholder="Año" value={anio} onChange={(e) => setAnio(parseInt(e.target.value))} />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit">{editingId ? "Actualizar Costo" : "Registrar Costo"}</Button>
+          </div>
+        </form>
+      </Modal>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          <select
-            value={mesFilter}
-            onChange={(e) => setMesFilter(parseInt(e.target.value))}
-            className="border rounded-md px-4 py-2"
-          >
-            {MESES.map((m, i) => (
-              <option key={i + 1} value={i + 1}>
-                {m}
-              </option>
-            ))}
-          </select>
-          <input
-            type="number"
-            value={anioFilter}
-            onChange={(e) => setAnioFilter(parseInt(e.target.value))}
-            className="border rounded-md px-4 py-2"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          <div className="bg-white p-4 rounded-lg shadow">
-            <p className="text-sm text-gray-600">Costos Fijos del período</p>
-            <p className="text-xl font-bold text-gray-900">${totalFijos.toFixed(2)}</p>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <p className="text-sm text-gray-600">Costos Variables del período</p>
-            <p className="text-xl font-bold text-gray-900">${totalVariables.toFixed(2)}</p>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="text-center py-12">Cargando...</div>
-        ) : costs.length === 0 ? (
-          <div className="text-center py-12 text-gray-500 bg-white rounded-lg shadow">
-            No hay costos registrados para este período
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-100 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Tipo</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Categoría</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Descripción</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Monto</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {costs.map((c) => (
-                  <tr key={c.id} className="border-b hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${c.tipo === "FIJO" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"}`}
-                      >
-                        {c.tipo === "FIJO" ? "Fijo" : "Variable"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{c.categoria}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{c.descripcion}</td>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">${c.monto.toFixed(2)}</td>
-                    <td className="px-6 py-4 text-sm space-x-2">
-                      <button onClick={() => editCost(c)} className="text-blue-600 hover:text-blue-800">
-                        Editar
-                      </button>
-                      <button onClick={() => deleteCost(c.id)} className="text-red-600 hover:text-red-800">
-                        Eliminar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Select value={mesFilter} onChange={(e) => setMesFilter(parseInt(e.target.value))}>
+          {MESES.map((m, i) => (
+            <option key={i + 1} value={i + 1}>
+              {m}
+            </option>
+          ))}
+        </Select>
+        <Input type="number" value={anioFilter} onChange={(e) => setAnioFilter(parseInt(e.target.value))} />
       </div>
-    </div>
+
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <StatCard label="Costos Fijos del período" value={`$${totalFijos.toFixed(2)}`} tone="brand" />
+        <StatCard label="Costos Variables del período" value={`$${totalVariables.toFixed(2)}`} tone="warning" />
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : costs.length === 0 ? (
+        <Card>
+          <EmptyState icon={Receipt} title="No hay costos registrados para este período" />
+        </Card>
+      ) : (
+        <Table>
+          <Thead>
+            <tr>
+              <Th>Tipo</Th>
+              <Th>Categoría</Th>
+              <Th>Descripción</Th>
+              <Th>Monto</Th>
+              <Th className="text-right">Acciones</Th>
+            </tr>
+          </Thead>
+          <Tbody>
+            {costs.map((c) => (
+              <Tr key={c.id}>
+                <Td>
+                  <Badge variant={c.tipo === "FIJO" ? "brand" : "info"}>{c.tipo === "FIJO" ? "Fijo" : "Variable"}</Badge>
+                </Td>
+                <Td className="text-carbon-400">{c.categoria}</Td>
+                <Td className="text-carbon-400">{c.descripcion}</Td>
+                <Td className="font-medium">${c.monto.toFixed(2)}</Td>
+                <Td>
+                  <div className="flex justify-end gap-3">
+                    <button onClick={() => editCost(c)} className="inline-flex items-center gap-1 text-xs font-medium text-brand-400 hover:text-brand-300">
+                      <Pencil className="h-3.5 w-3.5" /> Editar
+                    </button>
+                    <button onClick={() => deleteCost(c.id)} className="inline-flex items-center gap-1 text-xs font-medium text-red-400 hover:text-red-300">
+                      <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                    </button>
+                  </div>
+                </Td>
+              </Tr>
+            ))}
+          </Tbody>
+        </Table>
+      )}
+    </AppShell>
   );
 }

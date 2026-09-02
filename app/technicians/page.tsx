@@ -1,7 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Plus, UserCog, Pencil, Power } from "lucide-react";
 import { useToast } from "@/components/common/ToastProvider";
+import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader } from "@/components/common/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input, Label } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
+import { Badge } from "@/components/ui/Badge";
+import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
+import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
 
 interface Technician {
   id: string;
@@ -111,118 +121,105 @@ export default function TechniciansPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Técnicos</h1>
-          <button
+    <AppShell>
+      <PageHeader
+        title="Técnicos"
+        description="Tu equipo técnico y especialidades"
+        actions={
+          <Button
             onClick={() => {
               setEditingId(null);
               setFormData({ nombre: "", email: "", telefono: "", especialidad: "" });
-              setShowForm(!showForm);
+              setShowForm(true);
             }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
           >
-            {showForm ? "Cancelar" : "+ Nuevo Técnico"}
-          </button>
-        </div>
+            <Plus className="h-4 w-4" /> Nuevo Técnico
+          </Button>
+        }
+      />
 
-        {showForm && (
-          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md mb-8">
-            <div className="grid grid-cols-2 gap-4">
-              <input
-                type="text"
-                placeholder="Nombre *"
-                value={formData.nombre}
-                onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                className="border rounded px-3 py-2"
-                required
-              />
-              <input
-                type="email"
-                placeholder="Email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="border rounded px-3 py-2"
-              />
-              <input
-                type="tel"
-                placeholder="Teléfono"
-                value={formData.telefono}
-                onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
-                className="border rounded px-3 py-2"
-              />
-              <input
-                type="text"
-                placeholder="Especialidad"
-                value={formData.especialidad}
-                onChange={(e) => setFormData({ ...formData, especialidad: e.target.value })}
-                className="border rounded px-3 py-2"
-              />
+      <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? "Editar Técnico" : "Nuevo Técnico"}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="nombre">Nombre *</Label>
+            <Input id="nombre" value={formData.nombre} onChange={(e) => setFormData({ ...formData, nombre: e.target.value })} required />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
             </div>
-            <button
-              type="submit"
-              className="mt-4 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-            >
-              {editingId ? "Actualizar Técnico" : "Crear Técnico"}
-            </button>
-          </form>
-        )}
+            <div>
+              <Label htmlFor="telefono">Teléfono</Label>
+              <Input id="telefono" type="tel" value={formData.telefono} onChange={(e) => setFormData({ ...formData, telefono: e.target.value })} />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="especialidad">Especialidad</Label>
+            <Input id="especialidad" value={formData.especialidad} onChange={(e) => setFormData({ ...formData, especialidad: e.target.value })} />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit">{editingId ? "Actualizar Técnico" : "Crear Técnico"}</Button>
+          </div>
+        </form>
+      </Modal>
 
-        {loading ? (
-          <div className="text-center py-12">Cargando...</div>
-        ) : technicians.length === 0 ? (
-          <div className="text-center py-12 text-gray-500 bg-white rounded-lg shadow">
-            No hay técnicos registrados
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-100 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Nombre</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Email</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Teléfono</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Especialidad</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Estado</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {technicians.map((t) => (
-                  <tr key={t.id} className="border-b hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">{t.nombre}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{t.email || "-"}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{t.telefono || "-"}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{t.especialidad || "-"}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${t.activo ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}
-                      >
-                        {t.activo ? "Activo" : "Inactivo"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm space-x-2">
-                      <button
-                        onClick={() => editTechnician(t)}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => toggleActivo(t)}
-                        className="text-orange-600 hover:text-orange-800"
-                      >
-                        {t.activo ? "Desactivar" : "Activar"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : technicians.length === 0 ? (
+        <Card>
+          <EmptyState icon={UserCog} title="No hay técnicos registrados" />
+        </Card>
+      ) : (
+        <Table>
+          <Thead>
+            <tr>
+              <Th>Nombre</Th>
+              <Th>Email</Th>
+              <Th>Teléfono</Th>
+              <Th>Especialidad</Th>
+              <Th>Estado</Th>
+              <Th className="text-right">Acciones</Th>
+            </tr>
+          </Thead>
+          <Tbody>
+            {technicians.map((t) => (
+              <Tr key={t.id}>
+                <Td className="font-medium">{t.nombre}</Td>
+                <Td className="text-carbon-400">{t.email || "-"}</Td>
+                <Td className="text-carbon-400">{t.telefono || "-"}</Td>
+                <Td className="text-carbon-400">{t.especialidad || "-"}</Td>
+                <Td>
+                  <Badge variant={t.activo ? "success" : "neutral"}>{t.activo ? "Activo" : "Inactivo"}</Badge>
+                </Td>
+                <Td>
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={() => editTechnician(t)}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-brand-400 hover:text-brand-300"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> Editar
+                    </button>
+                    <button
+                      onClick={() => toggleActivo(t)}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-amber-400 hover:text-amber-300"
+                    >
+                      <Power className="h-3.5 w-3.5" /> {t.activo ? "Desactivar" : "Activar"}
+                    </button>
+                  </div>
+                </Td>
+              </Tr>
+            ))}
+          </Tbody>
+        </Table>
+      )}
+    </AppShell>
   );
 }

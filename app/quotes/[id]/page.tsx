@@ -3,7 +3,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, Printer, Pencil, X, ArrowRightCircle } from "lucide-react";
 import { useToast } from "@/components/common/ToastProvider";
+import { AppShell } from "@/components/layout/AppShell";
+import { Card, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input, Textarea } from "@/components/ui/Input";
+import { Badge } from "@/components/ui/Badge";
+import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
+import { Skeleton } from "@/components/ui/EmptyState";
 
 interface QuoteItem {
   id: string;
@@ -36,10 +44,10 @@ const STATUS_LABELS: Record<string, string> = {
   RECHAZADO: "Rechazado",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  PENDIENTE: "bg-yellow-100 text-yellow-800",
-  APROBADO: "bg-green-100 text-green-800",
-  RECHAZADO: "bg-red-100 text-red-800",
+const STATUS_VARIANT: Record<string, "warning" | "success" | "danger"> = {
+  PENDIENTE: "warning",
+  APROBADO: "success",
+  RECHAZADO: "danger",
 };
 
 export default function QuoteDetailPage() {
@@ -188,227 +196,170 @@ export default function QuoteDetailPage() {
     }
   }
 
-  if (loading) return <div className="text-center py-12">Cargando...</div>;
-  if (notFound || !quote)
-    return <div className="text-center py-12">Presupuesto no encontrado</div>;
-
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="no-print flex justify-between items-center mb-6">
-          <Link href="/quotes" className="text-blue-600 hover:text-blue-800 inline-block">
-            ← Volver a Presupuestos
-          </Link>
-          <button
-            onClick={() => window.print()}
-            className="px-3 py-1 text-sm bg-gray-700 text-white rounded hover:bg-gray-800"
-          >
-            Imprimir / PDF
-          </button>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Presupuesto #{quote.id.slice(-6)}
-              </h1>
-              <p className="text-gray-600 text-sm">
-                {new Date(quote.fecha).toLocaleDateString()}
-              </p>
-            </div>
-            <span
-              className={`px-3 py-1 rounded-full text-sm font-medium ${STATUS_COLORS[quote.status]}`}
-            >
-              {STATUS_LABELS[quote.status]}
-            </span>
+    <AppShell>
+      {loading ? (
+        <Skeleton className="h-64 w-full" />
+      ) : notFound || !quote ? (
+        <p className="text-sm text-carbon-400">Presupuesto no encontrado</p>
+      ) : (
+        <>
+          <div className="no-print mb-6 flex items-center justify-between">
+            <Link href="/quotes" className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-400 hover:text-brand-300">
+              <ArrowLeft className="h-4 w-4" /> Volver a Presupuestos
+            </Link>
+            <Button variant="secondary" onClick={() => window.print()}>
+              <Printer className="h-4 w-4" /> Imprimir / PDF
+            </Button>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <span className="text-gray-600 text-sm">Cliente:</span>
-              <p className="text-gray-900 font-medium">{quote.client.nombre}</p>
-            </div>
-            <div>
-              <span className="text-gray-600 text-sm">Vehículo:</span>
-              <p className="text-gray-900 font-medium">
-                {quote.vehicle.patente} - {quote.vehicle.marca} {quote.vehicle.modelo}
-              </p>
-            </div>
-          </div>
-
-          <div className="no-print flex gap-2 mb-4">
-            <button
-              onClick={() => changeStatus("PENDIENTE")}
-              disabled={quote.status === "PENDIENTE"}
-              className="px-3 py-1 text-sm bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200 disabled:opacity-40"
-            >
-              Marcar Pendiente
-            </button>
-            <button
-              onClick={() => changeStatus("APROBADO")}
-              disabled={quote.status === "APROBADO"}
-              className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded hover:bg-green-200 disabled:opacity-40"
-            >
-              Aprobar
-            </button>
-            <button
-              onClick={() => changeStatus("RECHAZADO")}
-              disabled={quote.status === "RECHAZADO"}
-              className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded hover:bg-red-200 disabled:opacity-40"
-            >
-              Rechazar
-            </button>
-            {quote.status === "APROBADO" && (
-              <button
-                onClick={convertToWorkOrder}
-                className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded hover:bg-blue-200"
-              >
-                Convertir a Orden de Trabajo
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-900">Ítems / Trabajos</h2>
-          <button
-            onClick={() => setEditing(!editing)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            {editing ? "Cancelar" : "Editar Presupuesto"}
-          </button>
-        </div>
-
-        {editing ? (
-          <form
-            onSubmit={handleSaveEdit}
-            className="bg-white p-6 rounded-lg shadow-md mb-8"
-          >
-            {items.map((item, index) => (
-              <div key={index} className="grid grid-cols-12 gap-2 mb-2">
-                <input
-                  type="text"
-                  placeholder="Descripción *"
-                  value={item.descripcion}
-                  onChange={(e) => updateItem(index, "descripcion", e.target.value)}
-                  className="col-span-6 border rounded px-3 py-2"
-                  required
-                />
-                <input
-                  type="number"
-                  placeholder="Cant."
-                  min="1"
-                  value={item.cantidad}
-                  onChange={(e) => updateItem(index, "cantidad", parseInt(e.target.value) || 1)}
-                  className="col-span-2 border rounded px-3 py-2"
-                  required
-                />
-                <input
-                  type="number"
-                  placeholder="Precio Unit."
-                  min="0"
-                  step="0.01"
-                  value={item.precioUnitario}
-                  onChange={(e) => updateItem(index, "precioUnitario", parseFloat(e.target.value) || 0)}
-                  className="col-span-3 border rounded px-3 py-2"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => removeItem(index)}
-                  disabled={items.length === 1}
-                  className="col-span-1 text-red-600 hover:text-red-800 disabled:opacity-30"
-                >
-                  ✕
-                </button>
+          <Card className="mb-8">
+            <CardContent>
+              <div className="mb-4 flex items-start justify-between">
+                <div>
+                  <h1 className="text-xl font-bold text-white">Presupuesto #{quote.id.slice(-6)}</h1>
+                  <p className="text-sm text-carbon-400">{new Date(quote.fecha).toLocaleDateString()}</p>
+                </div>
+                <Badge variant={STATUS_VARIANT[quote.status]}>{STATUS_LABELS[quote.status]}</Badge>
               </div>
-            ))}
-            <button
-              type="button"
-              onClick={addItem}
-              className="text-blue-600 hover:text-blue-800 text-sm mb-4"
-            >
-              + Agregar ítem
-            </button>
 
-            <textarea
-              placeholder="Observaciones"
-              value={observaciones}
-              onChange={(e) => setObservaciones(e.target.value)}
-              className="w-full border rounded px-3 py-2 mb-4"
-              rows={2}
-            />
+              <div className="mb-4 grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-xs text-carbon-400">Cliente</span>
+                  <p className="font-medium text-carbon-100">{quote.client.nombre}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-carbon-400">Vehículo</span>
+                  <p className="font-medium text-carbon-100">
+                    {quote.vehicle.patente} - {quote.vehicle.marca} {quote.vehicle.modelo}
+                  </p>
+                </div>
+              </div>
 
-            <div className="flex justify-between items-center">
-              <p className="text-xl font-bold text-gray-900">
-                Total: ${editTotal.toFixed(2)}
-              </p>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-              >
-                Guardar Cambios
-              </button>
-            </div>
-          </form>
-        ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden mb-8">
-            <table className="w-full">
-              <thead className="bg-gray-100 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                    Descripción
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                    Cantidad
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                    Precio Unit.
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                    Subtotal
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {quote.items.map((item) => (
-                  <tr key={item.id} className="border-b">
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {item.descripcion}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {item.cantidad}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      ${item.precioUnitario.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 font-medium">
-                      ${item.subtotal.toFixed(2)}
-                    </td>
+              <div className="no-print flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => changeStatus("PENDIENTE")} disabled={quote.status === "PENDIENTE"}>
+                  Marcar Pendiente
+                </Button>
+                <Button size="sm" variant="success" onClick={() => changeStatus("APROBADO")} disabled={quote.status === "APROBADO"}>
+                  Aprobar
+                </Button>
+                <Button size="sm" variant="danger" onClick={() => changeStatus("RECHAZADO")} disabled={quote.status === "RECHAZADO"}>
+                  Rechazar
+                </Button>
+                {quote.status === "APROBADO" && (
+                  <Button size="sm" onClick={convertToWorkOrder}>
+                    <ArrowRightCircle className="h-3.5 w-3.5" /> Convertir a Orden de Trabajo
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="no-print mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white">Ítems / Trabajos</h2>
+            <Button variant="secondary" onClick={() => setEditing(!editing)}>
+              <Pencil className="h-4 w-4" /> {editing ? "Cancelar" : "Editar Presupuesto"}
+            </Button>
+          </div>
+
+          {editing ? (
+            <Card className="mb-8">
+              <CardContent>
+                <form onSubmit={handleSaveEdit} className="space-y-4">
+                  <div className="space-y-2">
+                    {items.map((item, index) => (
+                      <div key={index} className="grid grid-cols-12 gap-2">
+                        <Input
+                          type="text"
+                          placeholder="Descripción *"
+                          value={item.descripcion}
+                          onChange={(e) => updateItem(index, "descripcion", e.target.value)}
+                          className="col-span-6"
+                          required
+                        />
+                        <Input
+                          type="number"
+                          placeholder="Cant."
+                          min="1"
+                          value={item.cantidad}
+                          onChange={(e) => updateItem(index, "cantidad", parseInt(e.target.value) || 1)}
+                          className="col-span-2"
+                          required
+                        />
+                        <Input
+                          type="number"
+                          placeholder="Precio Unit."
+                          min="0"
+                          step="0.01"
+                          value={item.precioUnitario}
+                          onChange={(e) => updateItem(index, "precioUnitario", parseFloat(e.target.value) || 0)}
+                          className="col-span-3"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeItem(index)}
+                          disabled={items.length === 1}
+                          className="col-span-1 flex items-center justify-center text-red-400 hover:text-red-300 disabled:opacity-30"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button type="button" onClick={addItem} className="text-sm font-medium text-brand-400 hover:text-brand-300">
+                    + Agregar ítem
+                  </button>
+
+                  <Textarea placeholder="Observaciones" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} rows={2} />
+
+                  <div className="flex items-center justify-between border-t border-carbon-700 pt-4">
+                    <p className="text-lg font-bold text-white">Total: ${editTotal.toFixed(2)}</p>
+                    <Button type="submit">Guardar Cambios</Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="mb-8">
+              <Table>
+                <Thead>
+                  <tr>
+                    <Th>Descripción</Th>
+                    <Th>Cantidad</Th>
+                    <Th>Precio Unit.</Th>
+                    <Th>Subtotal</Th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="bg-gray-50">
-                  <td colSpan={3} className="px-6 py-4 text-right font-bold text-gray-900">
-                    Total:
-                  </td>
-                  <td className="px-6 py-4 font-bold text-gray-900">
-                    ${quote.total.toFixed(2)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-            {quote.observaciones && (
-              <div className="p-6 border-t">
-                <span className="text-gray-600 text-sm">Observaciones:</span>
-                <p className="text-gray-900">{quote.observaciones}</p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+                </Thead>
+                <Tbody>
+                  {quote.items.map((item) => (
+                    <Tr key={item.id}>
+                      <Td>{item.descripcion}</Td>
+                      <Td className="text-carbon-400">{item.cantidad}</Td>
+                      <Td className="text-carbon-400">${item.precioUnitario.toFixed(2)}</Td>
+                      <Td className="font-medium">${item.subtotal.toFixed(2)}</Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+                <tfoot>
+                  <tr className="bg-carbon-800/60">
+                    <td colSpan={3} className="px-4 py-3 text-right font-bold text-white">
+                      Total:
+                    </td>
+                    <td className="px-4 py-3 font-bold text-white">${quote.total.toFixed(2)}</td>
+                  </tr>
+                </tfoot>
+              </Table>
+              {quote.observaciones && (
+                <div className="border-t border-carbon-700 p-5">
+                  <span className="text-xs text-carbon-400">Observaciones</span>
+                  <p className="text-carbon-100">{quote.observaciones}</p>
+                </div>
+              )}
+            </Card>
+          )}
+        </>
+      )}
+    </AppShell>
   );
 }

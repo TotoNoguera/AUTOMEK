@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Download, Printer } from "lucide-react";
 import { downloadCsv } from "@/lib/csv";
+import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader } from "@/components/common/PageHeader";
+import { Card, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
+import { Skeleton } from "@/components/ui/EmptyState";
 
 interface MonthlyPnl {
   mes: number;
@@ -60,74 +67,77 @@ export default function PnlReportPage() {
     );
   }
 
-  if (loading) return <div className="text-center py-12">Cargando...</div>;
-  if (!data) return <div className="text-center py-12">Error cargando el reporte</div>;
-
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="no-print flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Costos vs Ingresos (P&amp;L)</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={exportCsv}
-              className="px-3 py-1 text-sm border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
-            >
-              Exportar CSV
-            </button>
-            <button
-              onClick={() => window.print()}
-              className="px-3 py-1 text-sm bg-gray-700 text-white rounded hover:bg-gray-800"
-            >
-              Imprimir / PDF
-            </button>
-          </div>
-        </div>
+    <AppShell>
+      <PageHeader
+        className="no-print"
+        title="Costos vs Ingresos (P&L)"
+        description="Márgenes reales por mes"
+        actions={
+          data && (
+            <>
+              <Button variant="outline" onClick={exportCsv}>
+                <Download className="h-4 w-4" /> Exportar CSV
+              </Button>
+              <Button variant="secondary" onClick={() => window.print()}>
+                <Printer className="h-4 w-4" /> Imprimir / PDF
+              </Button>
+            </>
+          )
+        }
+      />
 
-        <div className="bg-white rounded-lg shadow-md p-6 sm:p-8 overflow-x-auto">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Últimos 6 meses</h2>
-          <table className="w-full border-collapse mb-8 min-w-[600px]">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left py-2 text-sm text-gray-600">Mes</th>
-                <th className="text-left py-2 text-sm text-gray-600">Ingresos</th>
-                <th className="text-left py-2 text-sm text-gray-600">Costos Fijos</th>
-                <th className="text-left py-2 text-sm text-gray-600">Costos Variables</th>
-                <th className="text-left py-2 text-sm text-gray-600">Costos Totales</th>
-                <th className="text-left py-2 text-sm text-gray-600">Margen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.monthlyData.map((m, i) => (
-                <tr key={i} className="border-b">
-                  <td className="py-2 text-sm">{MESES[m.mes - 1]} {m.anio}</td>
-                  <td className="py-2 text-sm text-green-700">${m.ingresos.toFixed(2)}</td>
-                  <td className="py-2 text-sm text-gray-600">${m.costosFijos.toFixed(2)}</td>
-                  <td className="py-2 text-sm text-gray-600">${m.costosVariables.toFixed(2)}</td>
-                  <td className="py-2 text-sm text-red-700">${m.costos.toFixed(2)}</td>
-                  <td className={`py-2 text-sm font-bold ${m.margen >= 0 ? "text-green-700" : "text-red-700"}`}>
-                    ${m.margen.toFixed(2)}
-                  </td>
+      {loading ? (
+        <Skeleton className="h-96 w-full" />
+      ) : !data ? (
+        <p className="text-sm text-carbon-400">Error cargando el reporte</p>
+      ) : (
+        <Card>
+          <CardContent>
+            <h2 className="mb-4 text-lg font-semibold text-white">Últimos 6 meses</h2>
+            <Table className="mb-8">
+              <Thead>
+                <tr>
+                  <Th>Mes</Th>
+                  <Th>Ingresos</Th>
+                  <Th>Costos Fijos</Th>
+                  <Th>Costos Variables</Th>
+                  <Th>Costos Totales</Th>
+                  <Th>Margen</Th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </Thead>
+              <Tbody>
+                {data.monthlyData.map((m, i) => (
+                  <Tr key={i}>
+                    <Td>{MESES[m.mes - 1]} {m.anio}</Td>
+                    <Td className="text-emerald-400">${m.ingresos.toFixed(2)}</Td>
+                    <Td className="text-carbon-400">${m.costosFijos.toFixed(2)}</Td>
+                    <Td className="text-carbon-400">${m.costosVariables.toFixed(2)}</Td>
+                    <Td className="text-red-400">${m.costos.toFixed(2)}</Td>
+                    <Td className={`font-bold ${m.margen >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      ${m.margen.toFixed(2)}
+                    </Td>
+                  </Tr>
+                ))}
+              </Tbody>
+            </Table>
 
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Costos por Categoría — Mes Actual</h2>
-          {data.costosPorCategoriaMesActual.length === 0 ? (
-            <p className="text-gray-500 text-sm">Sin costos registrados este mes</p>
-          ) : (
-            <ul className="text-sm text-gray-700 space-y-1">
-              {data.costosPorCategoriaMesActual.map((c, i) => (
-                <li key={i} className="flex justify-between border-b py-1">
-                  <span>{c.categoria}</span>
-                  <span className="font-medium">${c.monto.toFixed(2)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-    </div>
+            <h2 className="mb-4 text-lg font-semibold text-white">Costos por Categoría — Mes Actual</h2>
+            {data.costosPorCategoriaMesActual.length === 0 ? (
+              <p className="text-sm text-carbon-400">Sin costos registrados este mes</p>
+            ) : (
+              <ul className="divide-y divide-carbon-700 text-sm text-carbon-200">
+                {data.costosPorCategoriaMesActual.map((c, i) => (
+                  <li key={i} className="flex justify-between py-2">
+                    <span>{c.categoria}</span>
+                    <span className="font-medium">${c.monto.toFixed(2)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </AppShell>
   );
 }

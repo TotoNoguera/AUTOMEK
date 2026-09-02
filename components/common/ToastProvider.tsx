@@ -34,24 +34,24 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }
 
   const colors: Record<ToastType, string> = {
-    success: "bg-green-600",
-    error: "bg-red-600",
-    info: "bg-gray-800",
+    success: "border-emerald-500/40 bg-carbon-800 text-emerald-300",
+    error: "border-red-500/40 bg-carbon-800 text-red-300",
+    info: "border-carbon-600 bg-carbon-800 text-carbon-200",
   };
 
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-[calc(100vw-2rem)]">
+      <div className="fixed bottom-4 right-4 z-50 flex max-w-[calc(100vw-2rem)] flex-col gap-2">
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`${colors[t.type]} text-white px-4 py-3 rounded-md shadow-lg flex items-start justify-between gap-3 min-w-[240px] max-w-sm`}
+            className={`${colors[t.type]} animate-fade-in flex min-w-[240px] max-w-sm items-start justify-between gap-3 rounded-lg border px-4 py-3 shadow-elevated`}
           >
             <span className="text-sm">{t.message}</span>
             <button
               onClick={() => dismiss(t.id)}
-              className="text-white/80 hover:text-white text-sm leading-none"
+              className="text-sm leading-none text-carbon-400 hover:text-white"
               aria-label="Cerrar notificación"
             >
               ✕

@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Plus, Target, X } from "lucide-react";
 import { useToast } from "@/components/common/ToastProvider";
+import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader } from "@/components/common/PageHeader";
+import { Card, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input, Select } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
+import { Badge } from "@/components/ui/Badge";
+import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
 
 interface Goal {
   id: string;
@@ -20,11 +29,11 @@ const TIPO_LABELS: Record<string, string> = {
   CLIENTES_NUEVOS: "Clientes Nuevos",
 };
 
-const ESTADO_COLORS: Record<string, string> = {
-  EN_PROGRESO: "bg-blue-100 text-blue-800",
-  ALCANZADO: "bg-green-100 text-green-800",
-  NO_ALCANZADO: "bg-red-100 text-red-800",
-  CANCELADO: "bg-gray-100 text-gray-800",
+const ESTADO_VARIANT: Record<string, "info" | "success" | "danger" | "neutral"> = {
+  EN_PROGRESO: "info",
+  ALCANZADO: "success",
+  NO_ALCANZADO: "danger",
+  CANCELADO: "neutral",
 };
 
 const ESTADO_LABELS: Record<string, string> = {
@@ -124,125 +133,109 @@ export default function GoalsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Objetivos y Metas</h1>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            {showForm ? "Cancelar" : "+ Nueva Meta"}
-          </button>
-        </div>
+    <AppShell>
+      <PageHeader
+        title="Objetivos y Metas"
+        description="Definí metas mensuales y seguí el progreso real"
+        actions={
+          <Button onClick={() => setShowForm(true)}>
+            <Plus className="h-4 w-4" /> Nueva Meta
+          </Button>
+        }
+      />
 
-        {showForm && (
-          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md mb-8">
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <select
-                value={tipo}
-                onChange={(e) => setTipo(e.target.value)}
-                className="border rounded px-3 py-2"
-              >
-                <option value="INGRESO_MENSUAL">Ingreso Mensual ($)</option>
-                <option value="ORDENES_MENSUALES">Órdenes Mensuales (cantidad)</option>
-                <option value="CLIENTES_NUEVOS">Clientes Nuevos (cantidad)</option>
-              </select>
-              <input
-                type="number"
-                placeholder="Objetivo *"
-                min="0.01"
-                step="0.01"
-                value={objetivo}
-                onChange={(e) => setObjetivo(e.target.value)}
-                className="border rounded px-3 py-2"
-                required
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <select
-                value={mes}
-                onChange={(e) => setMes(parseInt(e.target.value))}
-                className="border rounded px-3 py-2"
-              >
-                {MESES.map((m, i) => (
-                  <option key={i + 1} value={i + 1}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                placeholder="Año"
-                value={anio}
-                onChange={(e) => setAnio(parseInt(e.target.value))}
-                className="border rounded px-3 py-2"
-              />
-            </div>
-            <input
-              type="text"
-              placeholder="Notas"
-              value={notas}
-              onChange={(e) => setNotas(e.target.value)}
-              className="w-full border rounded px-3 py-2 mb-4"
+      <Modal open={showForm} onClose={() => setShowForm(false)} title="Nueva Meta">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Select value={tipo} onChange={(e) => setTipo(e.target.value)}>
+              <option value="INGRESO_MENSUAL">Ingreso Mensual ($)</option>
+              <option value="ORDENES_MENSUALES">Órdenes Mensuales (cantidad)</option>
+              <option value="CLIENTES_NUEVOS">Clientes Nuevos (cantidad)</option>
+            </Select>
+            <Input
+              type="number"
+              placeholder="Objetivo *"
+              min="0.01"
+              step="0.01"
+              value={objetivo}
+              onChange={(e) => setObjetivo(e.target.value)}
+              required
             />
-            <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
-              Crear Meta
-            </button>
-          </form>
-        )}
-
-        {loading ? (
-          <div className="text-center py-12">Cargando...</div>
-        ) : goals.length === 0 ? (
-          <div className="text-center py-12 text-gray-500 bg-white rounded-lg shadow">
-            No hay metas registradas
           </div>
-        ) : (
-          <div className="space-y-4">
-            {goals.map((g) => {
-              const pct = Math.min(100, (g.alcanzado / g.objetivo) * 100);
-              return (
-                <div key={g.id} className="bg-white p-6 rounded-lg shadow">
-                  <div className="flex justify-between items-start mb-2">
+          <div className="grid grid-cols-2 gap-4">
+            <Select value={mes} onChange={(e) => setMes(parseInt(e.target.value))}>
+              {MESES.map((m, i) => (
+                <option key={i + 1} value={i + 1}>
+                  {m}
+                </option>
+              ))}
+            </Select>
+            <Input type="number" placeholder="Año" value={anio} onChange={(e) => setAnio(parseInt(e.target.value))} />
+          </div>
+          <Input type="text" placeholder="Notas" value={notas} onChange={(e) => setNotas(e.target.value)} />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit">Crear Meta</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 w-full" />
+          ))}
+        </div>
+      ) : goals.length === 0 ? (
+        <Card>
+          <EmptyState icon={Target} title="No hay metas registradas" />
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {goals.map((g) => {
+            const pct = Math.min(100, (g.alcanzado / g.objetivo) * 100);
+            return (
+              <Card key={g.id}>
+                <CardContent>
+                  <div className="mb-3 flex items-start justify-between">
                     <div>
-                      <h3 className="font-bold text-gray-900">{TIPO_LABELS[g.tipo]}</h3>
-                      <p className="text-sm text-gray-600">
+                      <h3 className="font-semibold text-white">{TIPO_LABELS[g.tipo]}</h3>
+                      <p className="text-sm text-carbon-400">
                         {MESES[g.mes - 1]} {g.anio}
                       </p>
                     </div>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${ESTADO_COLORS[g.estado]}`}>
-                      {ESTADO_LABELS[g.estado]}
-                    </span>
+                    <Badge variant={ESTADO_VARIANT[g.estado]}>{ESTADO_LABELS[g.estado]}</Badge>
                   </div>
-                  <div className="flex justify-between text-sm text-gray-700 mb-1">
+                  <div className="mb-1.5 flex justify-between text-sm text-carbon-300">
                     <span>
                       {isMonto(g.tipo) ? `$${g.alcanzado.toFixed(2)}` : g.alcanzado} de{" "}
                       {isMonto(g.tipo) ? `$${g.objetivo.toFixed(2)}` : g.objetivo}
                     </span>
                     <span>{pct.toFixed(0)}%</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-carbon-700">
                     <div
-                      className={`h-3 rounded-full ${g.estado === "ALCANZADO" ? "bg-green-600" : "bg-blue-600"}`}
+                      className={`h-2.5 rounded-full transition-all ${g.estado === "ALCANZADO" ? "bg-emerald-500" : "bg-brand-500"}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  {g.notas && <p className="text-sm text-gray-500 mt-2">{g.notas}</p>}
+                  {g.notas && <p className="mt-2 text-sm text-carbon-400">{g.notas}</p>}
                   {g.estado !== "CANCELADO" && (
                     <button
                       onClick={() => cancelGoal(g.id)}
-                      className="mt-3 text-sm text-red-600 hover:text-red-800"
+                      className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-red-400 hover:text-red-300"
                     >
-                      Cancelar meta
+                      <X className="h-3.5 w-3.5" /> Cancelar meta
                     </button>
                   )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </AppShell>
   );
 }

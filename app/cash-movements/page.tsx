@@ -1,8 +1,18 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { Plus, Minus, Download, Wallet } from "lucide-react";
 import { useToast } from "@/components/common/ToastProvider";
 import { downloadCsv } from "@/lib/csv";
+import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader } from "@/components/common/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input, Select } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
+import { Badge } from "@/components/ui/Badge";
+import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
+import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
 
 interface PaymentMethod {
   id: string;
@@ -193,192 +203,129 @@ export default function CashMovementsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Caja y Movimientos</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={() => { setShowIngreso(!showIngreso); setShowEgreso(false); }}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-            >
-              {showIngreso ? "Cancelar" : "+ Nuevo Ingreso"}
-            </button>
-            <button
-              onClick={() => { setShowEgreso(!showEgreso); setShowIngreso(false); }}
-              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-            >
-              {showEgreso ? "Cancelar" : "+ Nuevo Egreso"}
-            </button>
+    <AppShell>
+      <PageHeader
+        title="Caja y Movimientos"
+        description="Ingresos y egresos de tu taller"
+        actions={
+          <>
+            <Button variant="success" onClick={() => { setShowIngreso(true); setShowEgreso(false); }}>
+              <Plus className="h-4 w-4" /> Nuevo Ingreso
+            </Button>
+            <Button variant="danger" onClick={() => { setShowEgreso(true); setShowIngreso(false); }}>
+              <Minus className="h-4 w-4" /> Nuevo Egreso
+            </Button>
+          </>
+        }
+      />
+
+      <Modal open={showIngreso} onClose={() => setShowIngreso(false)} title="Registrar Ingreso">
+        <form onSubmit={handleIngresoSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Select value={ingresoWorkOrderId} onChange={(e) => setIngresoWorkOrderId(e.target.value)}>
+              <option value="">Sin orden asociada (Anticipo)</option>
+              {workOrders.map((wo) => (
+                <option key={wo.id} value={wo.id}>
+                  {wo.client.nombre} - {wo.vehicle.patente} - Pendiente: ${pendienteDe(wo).toFixed(2)}
+                </option>
+              ))}
+            </Select>
+            <Select value={ingresoMethodId} onChange={(e) => setIngresoMethodId(e.target.value)} required>
+              <option value="">Método de Pago *</option>
+              {methods.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nombre}
+                </option>
+              ))}
+            </Select>
           </div>
-        </div>
-
-        {showIngreso && (
-          <form onSubmit={handleIngresoSubmit} className="bg-white p-6 rounded-lg shadow-md mb-8">
-            <h3 className="font-medium text-gray-900 mb-4">Registrar Ingreso</h3>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <select
-                value={ingresoWorkOrderId}
-                onChange={(e) => setIngresoWorkOrderId(e.target.value)}
-                className="border rounded px-3 py-2"
-              >
-                <option value="">Sin orden asociada (Anticipo)</option>
-                {workOrders.map((wo) => (
-                  <option key={wo.id} value={wo.id}>
-                    {wo.client.nombre} - {wo.vehicle.patente} - Pendiente: ${pendienteDe(wo).toFixed(2)}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={ingresoMethodId}
-                onChange={(e) => setIngresoMethodId(e.target.value)}
-                className="border rounded px-3 py-2"
-                required
-              >
-                <option value="">Método de Pago *</option>
-                {methods.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <input
-                type="number"
-                placeholder="Monto *"
-                min="0.01"
-                step="0.01"
-                value={ingresoMonto}
-                onChange={(e) => setIngresoMonto(e.target.value)}
-                className="border rounded px-3 py-2"
-                required
-              />
-              <input
-                type="text"
-                placeholder="Descripción"
-                value={ingresoDescripcion}
-                onChange={(e) => setIngresoDescripcion(e.target.value)}
-                className="border rounded px-3 py-2"
-              />
-            </div>
-            <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
-              Registrar Ingreso
-            </button>
-          </form>
-        )}
-
-        {showEgreso && (
-          <form onSubmit={handleEgresoSubmit} className="bg-white p-6 rounded-lg shadow-md mb-8">
-            <h3 className="font-medium text-gray-900 mb-4">Registrar Egreso</h3>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <select
-                value={egresoCategoria}
-                onChange={(e) => setEgresoCategoria(e.target.value)}
-                className="border rounded px-3 py-2"
-                required
-              >
-                <option value="">Categoría *</option>
-                {EGRESO_CATEGORIAS.map((c) => (
-                  <option key={c} value={c}>
-                    {CATEGORIA_LABELS[c]}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                placeholder="Monto *"
-                min="0.01"
-                step="0.01"
-                value={egresoMonto}
-                onChange={(e) => setEgresoMonto(e.target.value)}
-                className="border rounded px-3 py-2"
-                required
-              />
-            </div>
-            <input
-              type="text"
-              placeholder="Descripción"
-              value={egresoDescripcion}
-              onChange={(e) => setEgresoDescripcion(e.target.value)}
-              className="w-full border rounded px-3 py-2 mb-4"
-            />
-            <button type="submit" className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">
-              Registrar Egreso
-            </button>
-          </form>
-        )}
-
-        <div className="mb-6 flex flex-col sm:flex-row gap-3 sm:justify-between">
-          <select
-            value={tipoFilter}
-            onChange={(e) => setTipoFilter(e.target.value)}
-            className="border rounded-md px-4 py-2"
-          >
-            <option value="">Todos los movimientos</option>
-            <option value="INGRESO">Solo Ingresos</option>
-            <option value="EGRESO">Solo Egresos</option>
-          </select>
-          <button
-            onClick={exportCsv}
-            disabled={movements.length === 0}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 disabled:opacity-40"
-          >
-            Exportar CSV
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="text-center py-12">Cargando...</div>
-        ) : movements.length === 0 ? (
-          <div className="text-center py-12 text-gray-500 bg-white rounded-lg shadow">
-            No hay movimientos registrados
+          <div className="grid grid-cols-2 gap-4">
+            <Input type="number" placeholder="Monto *" min="0.01" step="0.01" value={ingresoMonto} onChange={(e) => setIngresoMonto(e.target.value)} required />
+            <Input type="text" placeholder="Descripción" value={ingresoDescripcion} onChange={(e) => setIngresoDescripcion(e.target.value)} />
           </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-100 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Fecha</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Tipo</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Categoría</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Orden</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Descripción</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Monto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {movements.map((m) => (
-                  <tr key={m.id} className="border-b hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {new Date(m.fecha).toLocaleDateString("es-AR")}
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${m.tipo === "INGRESO" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
-                      >
-                        {m.tipo === "INGRESO" ? "Ingreso" : "Egreso"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {CATEGORIA_LABELS[m.categoria] || m.categoria}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {m.workOrder ? `${m.workOrder.client.nombre} - ${m.workOrder.vehicle.patente}` : "-"}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{m.descripcion || "-"}</td>
-                    <td
-                      className={`px-6 py-4 text-sm font-medium ${m.tipo === "INGRESO" ? "text-green-700" : "text-red-700"}`}
-                    >
-                      {m.tipo === "INGRESO" ? "+" : "-"}${m.monto.toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setShowIngreso(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" variant="success">Registrar Ingreso</Button>
           </div>
-        )}
+        </form>
+      </Modal>
+
+      <Modal open={showEgreso} onClose={() => setShowEgreso(false)} title="Registrar Egreso">
+        <form onSubmit={handleEgresoSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Select value={egresoCategoria} onChange={(e) => setEgresoCategoria(e.target.value)} required>
+              <option value="">Categoría *</option>
+              {EGRESO_CATEGORIAS.map((c) => (
+                <option key={c} value={c}>
+                  {CATEGORIA_LABELS[c]}
+                </option>
+              ))}
+            </Select>
+            <Input type="number" placeholder="Monto *" min="0.01" step="0.01" value={egresoMonto} onChange={(e) => setEgresoMonto(e.target.value)} required />
+          </div>
+          <Input type="text" placeholder="Descripción" value={egresoDescripcion} onChange={(e) => setEgresoDescripcion(e.target.value)} />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setShowEgreso(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" variant="danger">Registrar Egreso</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Select value={tipoFilter} onChange={(e) => setTipoFilter(e.target.value)} className="sm:max-w-xs">
+          <option value="">Todos los movimientos</option>
+          <option value="INGRESO">Solo Ingresos</option>
+          <option value="EGRESO">Solo Egresos</option>
+        </Select>
+        <Button variant="outline" onClick={exportCsv} disabled={movements.length === 0}>
+          <Download className="h-4 w-4" /> Exportar CSV
+        </Button>
       </div>
-    </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : movements.length === 0 ? (
+        <Card>
+          <EmptyState icon={Wallet} title="No hay movimientos registrados" />
+        </Card>
+      ) : (
+        <Table>
+          <Thead>
+            <tr>
+              <Th>Fecha</Th>
+              <Th>Tipo</Th>
+              <Th>Categoría</Th>
+              <Th>Orden</Th>
+              <Th>Descripción</Th>
+              <Th>Monto</Th>
+            </tr>
+          </Thead>
+          <Tbody>
+            {movements.map((m) => (
+              <Tr key={m.id}>
+                <Td className="text-carbon-400">{new Date(m.fecha).toLocaleDateString("es-AR")}</Td>
+                <Td>
+                  <Badge variant={m.tipo === "INGRESO" ? "success" : "danger"}>{m.tipo === "INGRESO" ? "Ingreso" : "Egreso"}</Badge>
+                </Td>
+                <Td className="text-carbon-400">{CATEGORIA_LABELS[m.categoria] || m.categoria}</Td>
+                <Td className="text-carbon-400">{m.workOrder ? `${m.workOrder.client.nombre} - ${m.workOrder.vehicle.patente}` : "-"}</Td>
+                <Td className="text-carbon-400">{m.descripcion || "-"}</Td>
+                <Td className={`font-semibold ${m.tipo === "INGRESO" ? "text-emerald-400" : "text-red-400"}`}>
+                  {m.tipo === "INGRESO" ? "+" : "-"}${m.monto.toFixed(2)}
+                </Td>
+              </Tr>
+            ))}
+          </Tbody>
+        </Table>
+      )}
+    </AppShell>
   );
 }

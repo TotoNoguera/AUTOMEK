@@ -2,7 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Plus, Search, Users, Eye, Trash2 } from "lucide-react";
 import { useToast } from "@/components/common/ToastProvider";
+import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader } from "@/components/common/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input, Label } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
+import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
+import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
 
 interface Client {
   id: string;
@@ -94,145 +103,136 @@ export default function ClientsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Clientes</h1>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            {showForm ? "Cancelar" : "+ Nuevo Cliente"}
-          </button>
-        </div>
+    <AppShell>
+      <PageHeader
+        title="Clientes"
+        description="Gestioná la cartera de clientes de tu taller"
+        actions={
+          <Button onClick={() => setShowForm(true)}>
+            <Plus className="h-4 w-4" /> Nuevo Cliente
+          </Button>
+        }
+      />
 
-        {showForm && (
-          <form
-            onSubmit={handleSubmit}
-            className="bg-white p-6 rounded-lg shadow-md mb-8"
-          >
-            <div className="grid grid-cols-2 gap-4">
-              <input
-                type="text"
-                placeholder="Nombre *"
-                value={formData.nombre}
-                onChange={(e) =>
-                  setFormData({ ...formData, nombre: e.target.value })
-                }
-                className="border rounded px-3 py-2"
-                required
-              />
-              <input
+      <Modal open={showForm} onClose={() => setShowForm(false)} title="Nuevo Cliente">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="nombre">Nombre *</Label>
+            <Input
+              id="nombre"
+              type="text"
+              value={formData.nombre}
+              onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
                 type="email"
-                placeholder="Email"
                 value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                className="border rounded px-3 py-2"
-              />
-              <input
-                type="tel"
-                placeholder="Teléfono"
-                value={formData.telefono}
-                onChange={(e) =>
-                  setFormData({ ...formData, telefono: e.target.value })
-                }
-                className="border rounded px-3 py-2"
-              />
-              <input
-                type="text"
-                placeholder="Dirección"
-                value={formData.direccion}
-                onChange={(e) =>
-                  setFormData({ ...formData, direccion: e.target.value })
-                }
-                className="border rounded px-3 py-2"
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               />
             </div>
-            <button
-              type="submit"
-              className="mt-4 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-            >
-              Crear Cliente
-            </button>
-          </form>
-        )}
-
-        <div className="mb-6">
-          <input
-            type="text"
-            placeholder="Buscar clientes..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full border rounded-md px-4 py-2"
-          />
-        </div>
-
-        {loading ? (
-          <div className="text-center py-12">Cargando...</div>
-        ) : clients.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            No hay clientes registrados
+            <div>
+              <Label htmlFor="telefono">Teléfono</Label>
+              <Input
+                id="telefono"
+                type="tel"
+                value={formData.telefono}
+                onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+              />
+            </div>
           </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-100 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                    Nombre
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                    Email
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                    Teléfono
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                    Vehículos
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {clients.map((client) => (
-                  <tr key={client.id} className="border-b hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {client.nombre}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {client.email || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {client.telefono || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {client.vehicles.length}
-                    </td>
-                    <td className="px-6 py-4 text-sm space-x-2">
-                      <Link
-                        href={`/clients/${client.id}`}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        Ver
-                      </Link>
-                      <button
-                        onClick={() => deleteClient(client.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        Eliminar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div>
+            <Label htmlFor="direccion">Dirección</Label>
+            <Input
+              id="direccion"
+              type="text"
+              value={formData.direccion}
+              onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+            />
           </div>
-        )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit">Crear Cliente</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <div className="mb-5 relative max-w-sm">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-carbon-400" />
+        <Input
+          type="text"
+          placeholder="Buscar clientes..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9"
+        />
       </div>
-    </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : clients.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={Users}
+            title="No hay clientes registrados"
+            description="Creá tu primer cliente para empezar a gestionar el taller."
+            action={
+              <Button size="sm" onClick={() => setShowForm(true)}>
+                <Plus className="h-4 w-4" /> Nuevo Cliente
+              </Button>
+            }
+          />
+        </Card>
+      ) : (
+        <Table>
+          <Thead>
+            <tr>
+              <Th>Nombre</Th>
+              <Th>Email</Th>
+              <Th>Teléfono</Th>
+              <Th>Vehículos</Th>
+              <Th className="text-right">Acciones</Th>
+            </tr>
+          </Thead>
+          <Tbody>
+            {clients.map((client) => (
+              <Tr key={client.id}>
+                <Td className="font-medium">{client.nombre}</Td>
+                <Td className="text-carbon-400">{client.email || "-"}</Td>
+                <Td className="text-carbon-400">{client.telefono || "-"}</Td>
+                <Td className="text-carbon-400">{client.vehicles.length}</Td>
+                <Td>
+                  <div className="flex justify-end gap-3">
+                    <Link
+                      href={`/clients/${client.id}`}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-brand-400 hover:text-brand-300"
+                    >
+                      <Eye className="h-3.5 w-3.5" /> Ver
+                    </Link>
+                    <button
+                      onClick={() => deleteClient(client.id)}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                    </button>
+                  </div>
+                </Td>
+              </Tr>
+            ))}
+          </Tbody>
+        </Table>
+      )}
+    </AppShell>
   );
 }

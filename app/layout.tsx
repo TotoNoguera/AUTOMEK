@@ -3,10 +3,10 @@ import { Inter } from "next/font/google";
 import "@/styles/globals.css";
 import { Providers } from "./providers";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Taller Mecánico - Gestión",
+  title: "AUTOMEK — Gestión de Taller",
   description: "Sistema de gestión para talleres mecánicos",
 };
 
@@ -16,8 +16,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
-      <body className={inter.className}>
+    <html lang="es" className={`${inter.variable} dark`}>
+      <body className="font-sans">
         <Providers>{children}</Providers>
       </body>
     </html>

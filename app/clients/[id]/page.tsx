@@ -2,8 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
+import { ArrowLeft, Plus, Car, Pencil, Trash2, CreditCard } from "lucide-react";
 import { useToast } from "@/components/common/ToastProvider";
+import { AppShell } from "@/components/layout/AppShell";
+import { Card, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
+import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
+import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
 
 interface Vehicle {
   id: string;
@@ -25,7 +33,6 @@ interface Client {
 
 export default function ClientDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const { showToast } = useToast();
   const clientId = params.id as string;
 
@@ -131,186 +138,140 @@ export default function ClientDetailPage() {
     }
   }
 
-  if (loading) return <div className="text-center py-12">Cargando...</div>;
-  if (!client)
-    return <div className="text-center py-12">Cliente no encontrado</div>;
-
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        <Link href="/clients" className="text-blue-600 hover:text-blue-800 mb-6">
-          ← Volver a Clientes
-        </Link>
+    <AppShell>
+      <Link href="/clients" className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-brand-400 hover:text-brand-300">
+        <ArrowLeft className="h-4 w-4" /> Volver a Clientes
+      </Link>
 
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            {client.nombre}
-          </h1>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <span className="text-gray-600">Email:</span>
-              <p className="text-gray-900">{client.email || "-"}</p>
-            </div>
-            <div>
-              <span className="text-gray-600">Teléfono:</span>
-              <p className="text-gray-900">{client.telefono || "-"}</p>
-            </div>
-            <div className="col-span-2">
-              <span className="text-gray-600">Dirección:</span>
-              <p className="text-gray-900">{client.direccion || "-"}</p>
-            </div>
+      {loading ? (
+        <Skeleton className="h-40 w-full" />
+      ) : !client ? (
+        <p className="text-sm text-carbon-400">Cliente no encontrado</p>
+      ) : (
+        <>
+          <Card className="mb-8">
+            <CardContent>
+              <h1 className="mb-4 text-2xl font-bold text-white">{client.nombre}</h1>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-carbon-400">Email</span>
+                  <p className="text-carbon-100">{client.email || "-"}</p>
+                </div>
+                <div>
+                  <span className="text-carbon-400">Teléfono</span>
+                  <p className="text-carbon-100">{client.telefono || "-"}</p>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-carbon-400">Dirección</span>
+                  <p className="text-carbon-100">{client.direccion || "-"}</p>
+                </div>
+              </div>
+              <Link
+                href={`/clients/${client.id}/credit`}
+                className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-400 hover:text-brand-300"
+              >
+                <CreditCard className="h-4 w-4" /> Ver Cuenta Corriente
+              </Link>
+            </CardContent>
+          </Card>
+
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white">Vehículos</h2>
+            <Button onClick={() => { setEditingId(null); setShowForm(true); }}>
+              <Plus className="h-4 w-4" /> Nuevo Vehículo
+            </Button>
           </div>
-          <Link
-            href={`/clients/${client.id}/credit`}
-            className="inline-block mt-4 text-blue-600 hover:text-blue-800 text-sm font-medium"
-          >
-            Ver Cuenta Corriente →
-          </Link>
-        </div>
 
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-2xl font-bold text-gray-900">Vehículos</h2>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            {showForm ? "Cancelar" : "+ Nuevo Vehículo"}
-          </button>
-        </div>
+          <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? "Editar Vehículo" : "Nuevo Vehículo"}>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  type="text"
+                  placeholder="Patente *"
+                  value={formData.patente}
+                  onChange={(e) => setFormData({ ...formData, patente: e.target.value })}
+                  className="uppercase"
+                  required
+                />
+                <Input
+                  type="text"
+                  placeholder="Marca *"
+                  value={formData.marca}
+                  onChange={(e) => setFormData({ ...formData, marca: e.target.value })}
+                  required
+                />
+                <Input
+                  type="text"
+                  placeholder="Modelo *"
+                  value={formData.modelo}
+                  onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
+                  required
+                />
+                <Input
+                  type="number"
+                  placeholder="Año *"
+                  value={formData.anio}
+                  onChange={(e) => setFormData({ ...formData, anio: parseInt(e.target.value) })}
+                  required
+                />
+                <Input
+                  type="number"
+                  placeholder="Kilometraje"
+                  value={formData.kilometraje}
+                  onChange={(e) => setFormData({ ...formData, kilometraje: e.target.value })}
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit">{editingId ? "Actualizar Vehículo" : "Crear Vehículo"}</Button>
+              </div>
+            </form>
+          </Modal>
 
-        {showForm && (
-          <form
-            onSubmit={handleSubmit}
-            className="bg-white p-6 rounded-lg shadow-md mb-8"
-          >
-            <div className="grid grid-cols-2 gap-4">
-              <input
-                type="text"
-                placeholder="Patente *"
-                value={formData.patente}
-                onChange={(e) =>
-                  setFormData({ ...formData, patente: e.target.value })
-                }
-                className="border rounded px-3 py-2 uppercase"
-                required
-              />
-              <input
-                type="text"
-                placeholder="Marca *"
-                value={formData.marca}
-                onChange={(e) =>
-                  setFormData({ ...formData, marca: e.target.value })
-                }
-                className="border rounded px-3 py-2"
-                required
-              />
-              <input
-                type="text"
-                placeholder="Modelo *"
-                value={formData.modelo}
-                onChange={(e) =>
-                  setFormData({ ...formData, modelo: e.target.value })
-                }
-                className="border rounded px-3 py-2"
-                required
-              />
-              <input
-                type="number"
-                placeholder="Año *"
-                value={formData.anio}
-                onChange={(e) =>
-                  setFormData({ ...formData, anio: parseInt(e.target.value) })
-                }
-                className="border rounded px-3 py-2"
-                required
-              />
-              <input
-                type="number"
-                placeholder="Kilometraje"
-                value={formData.kilometraje}
-                onChange={(e) =>
-                  setFormData({ ...formData, kilometraje: e.target.value })
-                }
-                className="border rounded px-3 py-2"
-              />
-            </div>
-            <button
-              type="submit"
-              className="mt-4 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-            >
-              {editingId ? "Actualizar Vehículo" : "Crear Vehículo"}
-            </button>
-          </form>
-        )}
-
-        {client.vehicles.length === 0 ? (
-          <div className="text-center py-12 text-gray-500 bg-white rounded-lg">
-            Sin vehículos registrados
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-100 border-b">
+          {client.vehicles.length === 0 ? (
+            <Card>
+              <EmptyState icon={Car} title="Sin vehículos registrados" />
+            </Card>
+          ) : (
+            <Table>
+              <Thead>
                 <tr>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                    Patente
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                    Marca
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                    Modelo
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                    Año
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                    Km
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">
-                    Acciones
-                  </th>
+                  <Th>Patente</Th>
+                  <Th>Marca</Th>
+                  <Th>Modelo</Th>
+                  <Th>Año</Th>
+                  <Th>Km</Th>
+                  <Th className="text-right">Acciones</Th>
                 </tr>
-              </thead>
-              <tbody>
+              </Thead>
+              <Tbody>
                 {client.vehicles.map((vehicle) => (
-                  <tr key={vehicle.id} className="border-b hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                      {vehicle.patente}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {vehicle.marca}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {vehicle.modelo}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {vehicle.anio}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {vehicle.kilometraje || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-sm space-x-2">
-                      <button
-                        onClick={() => editVehicle(vehicle)}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => deleteVehicle(vehicle.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        Eliminar
-                      </button>
-                    </td>
-                  </tr>
+                  <Tr key={vehicle.id}>
+                    <Td className="font-medium">{vehicle.patente}</Td>
+                    <Td className="text-carbon-400">{vehicle.marca}</Td>
+                    <Td className="text-carbon-400">{vehicle.modelo}</Td>
+                    <Td className="text-carbon-400">{vehicle.anio}</Td>
+                    <Td className="text-carbon-400">{vehicle.kilometraje || "-"}</Td>
+                    <Td>
+                      <div className="flex justify-end gap-3">
+                        <button onClick={() => editVehicle(vehicle)} className="inline-flex items-center gap-1 text-xs font-medium text-brand-400 hover:text-brand-300">
+                          <Pencil className="h-3.5 w-3.5" /> Editar
+                        </button>
+                        <button onClick={() => deleteVehicle(vehicle.id)} className="inline-flex items-center gap-1 text-xs font-medium text-red-400 hover:text-red-300">
+                          <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                        </button>
+                      </div>
+                    </Td>
+                  </Tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
+              </Tbody>
+            </Table>
+          )}
+        </>
+      )}
+    </AppShell>
   );
 }

@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Download, ShieldCheck } from "lucide-react";
 import { downloadCsv } from "@/lib/csv";
+import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader } from "@/components/common/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Input";
+import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
+import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
 
 interface AuditLog {
   id: string;
@@ -74,70 +82,56 @@ export default function AuditLogsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Auditoría</h1>
+    <AppShell>
+      <PageHeader title="Auditoría" description="Historial de cambios sensibles del sistema" />
 
-        <div className="mb-6 flex flex-col sm:flex-row gap-3 sm:justify-between">
-          <select
-            value={entityType}
-            onChange={(e) => setEntityType(e.target.value)}
-            className="border rounded-md px-4 py-2"
-          >
-            <option value="">Todas las entidades</option>
-            <option value="QUOTE">Presupuestos</option>
-            <option value="WORK_ORDER">Órdenes de Trabajo</option>
-            <option value="PAYMENT">Pagos</option>
-            <option value="CASH_MOVEMENT">Movimientos de Caja</option>
-            <option value="DAILY_CLOSE">Cierres de Caja</option>
-            <option value="CLIENT_CREDIT">Cuenta Corriente</option>
-          </select>
-          <button
-            onClick={exportCsv}
-            disabled={logs.length === 0}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 disabled:opacity-40"
-          >
-            Exportar CSV
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="text-center py-12">Cargando...</div>
-        ) : logs.length === 0 ? (
-          <div className="text-center py-12 text-gray-500 bg-white rounded-lg shadow">
-            No hay registros de auditoría
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-100 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Fecha</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Acción</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Entidad</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Descripción</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((log) => (
-                  <tr key={log.id} className="border-b hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {new Date(log.timestamp).toLocaleString("es-AR")}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {ACCION_LABELS[log.accion] || log.accion}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{log.entityType}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {log.descripcion || log.newValue || "-"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Select value={entityType} onChange={(e) => setEntityType(e.target.value)} className="sm:max-w-xs">
+          <option value="">Todas las entidades</option>
+          <option value="QUOTE">Presupuestos</option>
+          <option value="WORK_ORDER">Órdenes de Trabajo</option>
+          <option value="PAYMENT">Pagos</option>
+          <option value="CASH_MOVEMENT">Movimientos de Caja</option>
+          <option value="DAILY_CLOSE">Cierres de Caja</option>
+          <option value="CLIENT_CREDIT">Cuenta Corriente</option>
+        </Select>
+        <Button variant="outline" onClick={exportCsv} disabled={logs.length === 0}>
+          <Download className="h-4 w-4" /> Exportar CSV
+        </Button>
       </div>
-    </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
+        </div>
+      ) : logs.length === 0 ? (
+        <Card>
+          <EmptyState icon={ShieldCheck} title="No hay registros de auditoría" />
+        </Card>
+      ) : (
+        <Table>
+          <Thead>
+            <tr>
+              <Th>Fecha</Th>
+              <Th>Acción</Th>
+              <Th>Entidad</Th>
+              <Th>Descripción</Th>
+            </tr>
+          </Thead>
+          <Tbody>
+            {logs.map((log) => (
+              <Tr key={log.id}>
+                <Td className="whitespace-nowrap text-carbon-400">{new Date(log.timestamp).toLocaleString("es-AR")}</Td>
+                <Td className="font-medium">{ACCION_LABELS[log.accion] || log.accion}</Td>
+                <Td className="text-carbon-400">{log.entityType}</Td>
+                <Td className="text-carbon-400">{log.descripcion || log.newValue || "-"}</Td>
+              </Tr>
+            ))}
+          </Tbody>
+        </Table>
+      )}
+    </AppShell>
   );
 }

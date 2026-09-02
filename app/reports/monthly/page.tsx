@@ -1,6 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Printer } from "lucide-react";
+import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader } from "@/components/common/PageHeader";
+import { Card, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { StatCard } from "@/components/common/StatCard";
+import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
+import { Skeleton } from "@/components/ui/EmptyState";
 
 interface StatsData {
   cobrosMes: number;
@@ -43,120 +51,110 @@ export default function MonthlyReportPage() {
     load();
   }, []);
 
-  if (loading) return <div className="text-center py-12">Cargando...</div>;
-  if (!stats) return <div className="text-center py-12">Error cargando el reporte</div>;
-
   const now = new Date();
-  const current = stats.monthlyData[stats.monthlyData.length - 1];
-  const neto = stats.cobrosMes - stats.egresosMes;
+  const current = stats?.monthlyData[stats.monthlyData.length - 1];
+  const neto = stats ? stats.cobrosMes - stats.egresosMes : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="no-print flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Resumen Mensual</h1>
-          <button
-            onClick={() => window.print()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Imprimir / Guardar PDF
-          </button>
-        </div>
+    <AppShell>
+      <PageHeader
+        className="no-print"
+        title="Resumen Mensual"
+        description="Reporte financiero imprimible"
+        actions={
+          stats && (
+            <Button variant="secondary" onClick={() => window.print()}>
+              <Printer className="h-4 w-4" /> Imprimir / Guardar PDF
+            </Button>
+          )
+        }
+      />
 
-        <div className="bg-white rounded-lg shadow-md p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-1">
-            Resumen Mensual — {MESES[now.getMonth()]} {now.getFullYear()}
-          </h2>
-          <p className="text-sm text-gray-500 mb-6">
-            Generado el {now.toLocaleDateString("es-AR")}
-          </p>
+      {loading ? (
+        <Skeleton className="h-96 w-full" />
+      ) : !stats ? (
+        <p className="text-sm text-carbon-400">Error cargando el reporte</p>
+      ) : (
+        <Card>
+          <CardContent>
+            <h2 className="text-xl font-bold text-white">
+              Resumen Mensual — {MESES[now.getMonth()]} {now.getFullYear()}
+            </h2>
+            <p className="mb-6 text-sm text-carbon-400">Generado el {now.toLocaleDateString("es-AR")}</p>
 
-          <div className="grid grid-cols-2 gap-6 mb-8">
-            <div className="border rounded-lg p-4">
-              <p className="text-sm text-gray-600">Ingresos del mes</p>
-              <p className="text-2xl font-bold text-green-700">${stats.cobrosMes.toFixed(2)}</p>
+            <div className="mb-8 grid grid-cols-2 gap-4">
+              <StatCard label="Ingresos del mes" value={`$${stats.cobrosMes.toFixed(2)}`} tone="success" />
+              <StatCard label="Egresos del mes" value={`$${stats.egresosMes.toFixed(2)}`} tone="danger" />
+              <StatCard label="Neto del mes" value={`$${neto.toFixed(2)}`} tone={neto >= 0 ? "success" : "danger"} />
+              <StatCard label="Deudas pendientes" value={`$${stats.deudasPendientes.toFixed(2)}`} tone="warning" />
             </div>
-            <div className="border rounded-lg p-4">
-              <p className="text-sm text-gray-600">Egresos del mes</p>
-              <p className="text-2xl font-bold text-red-700">${stats.egresosMes.toFixed(2)}</p>
-            </div>
-            <div className="border rounded-lg p-4">
-              <p className="text-sm text-gray-600">Neto del mes</p>
-              <p className={`text-2xl font-bold ${neto >= 0 ? "text-green-700" : "text-red-700"}`}>
-                ${neto.toFixed(2)}
-              </p>
-            </div>
-            <div className="border rounded-lg p-4">
-              <p className="text-sm text-gray-600">Deudas pendientes</p>
-              <p className="text-2xl font-bold text-orange-700">${stats.deudasPendientes.toFixed(2)}</p>
-            </div>
-          </div>
 
-          <h3 className="font-bold text-gray-900 mb-3">Órdenes del mes</h3>
-          <p className="text-gray-700 mb-6">{current?.ordenes ?? 0} órdenes de trabajo creadas</p>
+            <h3 className="mb-3 font-semibold text-white">Órdenes del mes</h3>
+            <p className="mb-6 text-sm text-carbon-300">{current?.ordenes ?? 0} órdenes de trabajo creadas</p>
 
-          {stats.objetivosMes.length > 0 && (
-            <>
-              <h3 className="font-bold text-gray-900 mb-3">Objetivos vs Real</h3>
-              <table className="w-full mb-6 border-collapse">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 text-sm text-gray-600">Objetivo</th>
-                    <th className="text-left py-2 text-sm text-gray-600">Meta</th>
-                    <th className="text-left py-2 text-sm text-gray-600">Real</th>
-                    <th className="text-left py-2 text-sm text-gray-600">Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.objetivosMes.map((g, i) => (
-                    <tr key={i} className="border-b">
-                      <td className="py-2 text-sm">{TIPO_LABELS[g.tipo]}</td>
-                      <td className="py-2 text-sm">{g.objetivo}</td>
-                      <td className="py-2 text-sm">{g.alcanzado}</td>
-                      <td className="py-2 text-sm">{g.estado}</td>
+            {stats.objetivosMes.length > 0 && (
+              <>
+                <h3 className="mb-3 font-semibold text-white">Objetivos vs Real</h3>
+                <Table className="mb-6">
+                  <Thead>
+                    <tr>
+                      <Th>Objetivo</Th>
+                      <Th>Meta</Th>
+                      <Th>Real</Th>
+                      <Th>Estado</Th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          )}
+                  </Thead>
+                  <Tbody>
+                    {stats.objetivosMes.map((g, i) => (
+                      <Tr key={i}>
+                        <Td>{TIPO_LABELS[g.tipo]}</Td>
+                        <Td className="text-carbon-400">{g.objetivo}</Td>
+                        <Td className="text-carbon-400">{g.alcanzado}</Td>
+                        <Td className="text-carbon-400">{g.estado}</Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+              </>
+            )}
 
-          <h3 className="font-bold text-gray-900 mb-3">Vehículos más frecuentes</h3>
-          {stats.vehiculosFrecuentes.length === 0 ? (
-            <p className="text-gray-500 text-sm">Sin datos</p>
-          ) : (
-            <ul className="list-disc list-inside text-gray-700 mb-6">
-              {stats.vehiculosFrecuentes.map((v, i) => (
-                <li key={i}>
-                  {v.patente} — {v.marca} {v.modelo} ({v.count} órdenes)
-                </li>
-              ))}
-            </ul>
-          )}
+            <h3 className="mb-3 font-semibold text-white">Vehículos más frecuentes</h3>
+            {stats.vehiculosFrecuentes.length === 0 ? (
+              <p className="mb-6 text-sm text-carbon-400">Sin datos</p>
+            ) : (
+              <ul className="mb-6 list-inside list-disc text-sm text-carbon-300">
+                {stats.vehiculosFrecuentes.map((v, i) => (
+                  <li key={i}>
+                    {v.patente} — {v.marca} {v.modelo} ({v.count} órdenes)
+                  </li>
+                ))}
+              </ul>
+            )}
 
-          <h3 className="font-bold text-gray-900 mb-3">Últimos 6 meses</h3>
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left py-2 text-sm text-gray-600">Mes</th>
-                <th className="text-left py-2 text-sm text-gray-600">Ingresos</th>
-                <th className="text-left py-2 text-sm text-gray-600">Egresos</th>
-                <th className="text-left py-2 text-sm text-gray-600">Órdenes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stats.monthlyData.map((m, i) => (
-                <tr key={i} className="border-b">
-                  <td className="py-2 text-sm">{MESES[m.mes - 1]} {m.anio}</td>
-                  <td className="py-2 text-sm text-green-700">${m.ingresos.toFixed(2)}</td>
-                  <td className="py-2 text-sm text-red-700">${m.egresos.toFixed(2)}</td>
-                  <td className="py-2 text-sm">{m.ordenes}</td>
+            <h3 className="mb-3 font-semibold text-white">Últimos 6 meses</h3>
+            <Table>
+              <Thead>
+                <tr>
+                  <Th>Mes</Th>
+                  <Th>Ingresos</Th>
+                  <Th>Egresos</Th>
+                  <Th>Órdenes</Th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+              </Thead>
+              <Tbody>
+                {stats.monthlyData.map((m, i) => (
+                  <Tr key={i}>
+                    <Td>{MESES[m.mes - 1]} {m.anio}</Td>
+                    <Td className="text-emerald-400">${m.ingresos.toFixed(2)}</Td>
+                    <Td className="text-red-400">${m.egresos.toFixed(2)}</Td>
+                    <Td className="text-carbon-400">{m.ordenes}</Td>
+                  </Tr>
+                ))}
+              </Tbody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+    </AppShell>
   );
 }

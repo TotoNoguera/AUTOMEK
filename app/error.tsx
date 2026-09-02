@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+import { AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 export default function Error({
   error,
@@ -14,20 +16,18 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Ocurrió un error inesperado
-        </h1>
-        <p className="text-gray-600 mb-6">
+    <div className="flex min-h-screen items-center justify-center bg-carbon-950 px-4">
+      <div className="flex max-w-sm flex-col items-center text-center">
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10 text-red-400">
+          <AlertTriangle className="h-6 w-6" />
+        </div>
+        <h1 className="text-lg font-bold text-white">Ocurrió un error inesperado</h1>
+        <p className="mt-2 text-sm text-carbon-400">
           Por favor intentá nuevamente. Si el problema persiste, contactá al soporte.
         </p>
-        <button
-          onClick={reset}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
+        <Button onClick={reset} className="mt-6">
           Reintentar
-        </button>
+        </Button>
       </div>
     </div>
   );

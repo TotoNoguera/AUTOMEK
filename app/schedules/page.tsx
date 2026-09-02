@@ -2,7 +2,18 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { ChevronLeft, ChevronRight, Plus, CalendarDays, Eye } from "lucide-react";
 import { useToast } from "@/components/common/ToastProvider";
+import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader } from "@/components/common/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input, Select } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
+import { Badge } from "@/components/ui/Badge";
+import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { cn } from "@/lib/utils";
 
 interface Schedule {
   id: string;
@@ -29,12 +40,20 @@ const STATUS_LABELS: Record<string, string> = {
   COMPLETADO: "Completado",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  PENDIENTE: "bg-yellow-100 text-yellow-800",
-  CONFIRMADO: "bg-blue-100 text-blue-800",
-  EN_ESPERA: "bg-orange-100 text-orange-800",
-  CANCELADO: "bg-red-100 text-red-800",
-  COMPLETADO: "bg-green-100 text-green-800",
+const STATUS_VARIANT: Record<string, "warning" | "info" | "neutral" | "danger" | "success"> = {
+  PENDIENTE: "warning",
+  CONFIRMADO: "info",
+  EN_ESPERA: "neutral",
+  CANCELADO: "danger",
+  COMPLETADO: "success",
+};
+
+const STATUS_DOT: Record<string, string> = {
+  PENDIENTE: "bg-amber-400",
+  CONFIRMADO: "bg-sky-400",
+  EN_ESPERA: "bg-carbon-400",
+  CANCELADO: "bg-red-400",
+  COMPLETADO: "bg-emerald-400",
 };
 
 function toDateStr(d: Date) {
@@ -139,6 +158,7 @@ export default function SchedulesPage() {
   }
 
   const selectedClient = clients.find((c) => c.id === selectedClientId);
+  const todayStr = toDateStr(new Date());
 
   function openCreateForm(dateStr: string) {
     setFormFecha(dateStr);
@@ -194,203 +214,191 @@ export default function SchedulesPage() {
   const dayLabels = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Agenda / Turnos</h1>
+    <AppShell>
+      <PageHeader
+        title="Agenda / Turnos"
+        description="Calendario de turnos del taller"
+        actions={
+          <Button onClick={() => openCreateForm(selectedDay)}>
+            <Plus className="h-4 w-4" /> Nuevo Turno
+          </Button>
+        }
+      />
+
+      <Modal open={showForm} onClose={() => setShowForm(false)} title="Nuevo Turno">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Select
+              value={selectedClientId}
+              onChange={(e) => {
+                setSelectedClientId(e.target.value);
+                setSelectedVehicleId("");
+              }}
+              required
+            >
+              <option value="">Seleccionar Cliente *</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.nombre}
+                </option>
+              ))}
+            </Select>
+
+            <Select
+              value={selectedVehicleId}
+              onChange={(e) => setSelectedVehicleId(e.target.value)}
+              required
+              disabled={!selectedClientId}
+            >
+              <option value="">Seleccionar Vehículo *</option>
+              {selectedClient?.vehicles.map((vehicle) => (
+                <option key={vehicle.id} value={vehicle.id}>
+                  {vehicle.patente} - {vehicle.marca} {vehicle.modelo}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input type="date" value={formFecha} onChange={(e) => setFormFecha(e.target.value)} required />
+            <Input type="time" value={formHora} onChange={(e) => setFormHora(e.target.value)} required />
+          </div>
+
+          <Input type="text" placeholder="Motivo *" value={formMotivo} onChange={(e) => setFormMotivo(e.target.value)} required />
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit">Crear Turno</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-1 rounded-lg border border-carbon-700 bg-carbon-900 p-1">
           <button
-            onClick={() => openCreateForm(selectedDay)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            onClick={() => setView("mes")}
+            className={cn(
+              "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+              view === "mes" ? "bg-brand-500 text-white" : "text-carbon-300 hover:text-white"
+            )}
           >
-            {showForm ? "Cancelar" : "+ Nuevo Turno"}
+            Mes
+          </button>
+          <button
+            onClick={() => setView("semana")}
+            className={cn(
+              "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+              view === "semana" ? "bg-brand-500 text-white" : "text-carbon-300 hover:text-white"
+            )}
+          >
+            Semana
           </button>
         </div>
-
-        {showForm && (
-          <form
-            onSubmit={handleSubmit}
-            className="bg-white p-6 rounded-lg shadow-md mb-8"
-          >
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <select
-                value={selectedClientId}
-                onChange={(e) => {
-                  setSelectedClientId(e.target.value);
-                  setSelectedVehicleId("");
-                }}
-                className="border rounded px-3 py-2"
-                required
-              >
-                <option value="">Seleccionar Cliente *</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.nombre}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={selectedVehicleId}
-                onChange={(e) => setSelectedVehicleId(e.target.value)}
-                className="border rounded px-3 py-2"
-                required
-                disabled={!selectedClientId}
-              >
-                <option value="">Seleccionar Vehículo *</option>
-                {selectedClient?.vehicles.map((vehicle) => (
-                  <option key={vehicle.id} value={vehicle.id}>
-                    {vehicle.patente} - {vehicle.marca} {vehicle.modelo}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <input
-                type="date"
-                value={formFecha}
-                onChange={(e) => setFormFecha(e.target.value)}
-                className="border rounded px-3 py-2"
-                required
-              />
-              <input
-                type="time"
-                value={formHora}
-                onChange={(e) => setFormHora(e.target.value)}
-                className="border rounded px-3 py-2"
-                required
-              />
-            </div>
-
-            <input
-              type="text"
-              placeholder="Motivo *"
-              value={formMotivo}
-              onChange={(e) => setFormMotivo(e.target.value)}
-              className="w-full border rounded px-3 py-2 mb-4"
-              required
-            />
-
-            <button
-              type="submit"
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-            >
-              Crear Turno
-            </button>
-          </form>
-        )}
-
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setView("mes")}
-              className={`px-3 py-1 rounded text-sm ${view === "mes" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-800"}`}
-            >
-              Mes
-            </button>
-            <button
-              onClick={() => setView("semana")}
-              className={`px-3 py-1 rounded text-sm ${view === "semana" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-800"}`}
-            >
-              Semana
-            </button>
-          </div>
-          <div className="flex items-center gap-3">
-            <button onClick={() => navigate(-1)} className="px-2 py-1 border rounded">
-              ←
-            </button>
-            <span className="font-medium text-gray-900 capitalize">
-              {view === "mes" ? monthLabel : weekLabel}
-            </span>
-            <button onClick={() => navigate(1)} className="px-2 py-1 border rounded">
-              →
-            </button>
-          </div>
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate(-1)} className="rounded-md border border-carbon-600 p-1.5 text-carbon-300 hover:bg-carbon-800 hover:text-white">
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="min-w-[9rem] text-center text-sm font-medium capitalize text-carbon-100">
+            {view === "mes" ? monthLabel : weekLabel}
+          </span>
+          <button onClick={() => navigate(1)} className="rounded-md border border-carbon-600 p-1.5 text-carbon-300 hover:bg-carbon-800 hover:text-white">
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
+      </div>
 
-        <div className="bg-white rounded-lg shadow overflow-hidden mb-8">
-          <div className="grid grid-cols-7 bg-gray-100 border-b">
-            {dayLabels.map((d) => (
-              <div key={d} className="px-2 py-2 text-center text-xs font-medium text-gray-600">
-                {d}
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7">
-            {daysToShow.map((day) => {
-              const dateStr = toDateStr(day);
-              const dayTurnos = schedulesByDay[dateStr] || [];
-              const isCurrentMonth = day.getMonth() === refDate.getMonth();
-              const isSelected = dateStr === selectedDay;
-              return (
-                <button
-                  key={dateStr}
-                  onClick={() => setSelectedDay(dateStr)}
-                  className={`min-h-[80px] border-b border-r p-1 text-left align-top ${isSelected ? "bg-blue-50" : ""} ${!isCurrentMonth && view === "mes" ? "bg-gray-50 text-gray-400" : ""}`}
-                >
-                  <div className="text-xs font-medium">{day.getDate()}</div>
+      <div className="mb-8 overflow-hidden rounded-xl border border-carbon-700">
+        <div className="grid grid-cols-7 border-b border-carbon-700 bg-carbon-800/60">
+          {dayLabels.map((d) => (
+            <div key={d} className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-carbon-400">
+              {d}
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7">
+          {daysToShow.map((day) => {
+            const dateStr = toDateStr(day);
+            const dayTurnos = schedulesByDay[dateStr] || [];
+            const isCurrentMonth = day.getMonth() === refDate.getMonth();
+            const isSelected = dateStr === selectedDay;
+            const isToday = dateStr === todayStr;
+            return (
+              <button
+                key={dateStr}
+                onClick={() => setSelectedDay(dateStr)}
+                className={cn(
+                  "min-h-[84px] border-b border-r border-carbon-700 p-1.5 text-left align-top transition-colors last:border-r-0",
+                  isSelected ? "bg-brand-500/10 ring-1 ring-inset ring-brand-500/40" : "hover:bg-carbon-800/50",
+                  !isCurrentMonth && view === "mes" && "bg-carbon-900/40 text-carbon-600"
+                )}
+              >
+                <div className={cn(
+                  "flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium",
+                  isToday ? "bg-brand-500 text-white" : "text-carbon-300"
+                )}>
+                  {day.getDate()}
+                </div>
+                <div className="mt-1 space-y-0.5">
                   {dayTurnos.slice(0, 3).map((t) => (
-                    <div
-                      key={t.id}
-                      className={`text-[10px] rounded px-1 mt-1 truncate ${STATUS_COLORS[t.status]}`}
-                    >
+                    <div key={t.id} className="flex items-center gap-1 truncate text-[10px] text-carbon-300">
+                      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", STATUS_DOT[t.status])} />
                       {t.hora} {t.client.nombre}
                     </div>
                   ))}
                   {dayTurnos.length > 3 && (
-                    <div className="text-[10px] text-gray-500">+{dayTurnos.length - 3} más</div>
+                    <div className="text-[10px] text-carbon-500">+{dayTurnos.length - 3} más</div>
                   )}
-                </button>
-              );
-            })}
-          </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
-
-        <h2 className="text-xl font-bold text-gray-900 mb-4">
-          Turnos del {new Date(`${selectedDay}T00:00:00`).toLocaleDateString("es-AR")}
-        </h2>
-
-        {(schedulesByDay[selectedDay] || []).length === 0 ? (
-          <div className="text-center py-8 text-gray-500 bg-white rounded-lg shadow">
-            No hay turnos para este día
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-100 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Hora</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Cliente</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Vehículo</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Motivo</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Estado</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-900">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(schedulesByDay[selectedDay] || []).map((s) => (
-                  <tr key={s.id} className="border-b hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">{s.hora}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{s.client.nombre}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{s.vehicle.patente}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{s.motivo}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[s.status]}`}>
-                        {STATUS_LABELS[s.status]}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <Link href={`/schedules/${s.id}`} className="text-blue-600 hover:text-blue-800">
-                        Ver
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
-    </div>
+
+      <h2 className="mb-4 text-lg font-semibold text-white">
+        Turnos del {new Date(`${selectedDay}T00:00:00`).toLocaleDateString("es-AR")}
+      </h2>
+
+      {(schedulesByDay[selectedDay] || []).length === 0 ? (
+        <Card>
+          <EmptyState icon={CalendarDays} title="No hay turnos para este día" />
+        </Card>
+      ) : (
+        <Table>
+          <Thead>
+            <tr>
+              <Th>Hora</Th>
+              <Th>Cliente</Th>
+              <Th>Vehículo</Th>
+              <Th>Motivo</Th>
+              <Th>Estado</Th>
+              <Th className="text-right">Acciones</Th>
+            </tr>
+          </Thead>
+          <Tbody>
+            {(schedulesByDay[selectedDay] || []).map((s) => (
+              <Tr key={s.id}>
+                <Td className="font-medium">{s.hora}</Td>
+                <Td>{s.client.nombre}</Td>
+                <Td className="text-carbon-400">{s.vehicle.patente}</Td>
+                <Td className="text-carbon-400">{s.motivo}</Td>
+                <Td>
+                  <Badge variant={STATUS_VARIANT[s.status]}>{STATUS_LABELS[s.status]}</Badge>
+                </Td>
+                <Td>
+                  <div className="flex justify-end">
+                    <Link href={`/schedules/${s.id}`} className="inline-flex items-center gap-1 text-xs font-medium text-brand-400 hover:text-brand-300">
+                      <Eye className="h-3.5 w-3.5" /> Ver
+                    </Link>
+                  </div>
+                </Td>
+              </Tr>
+            ))}
+          </Tbody>
+        </Table>
+      )}
+    </AppShell>
   );
 }

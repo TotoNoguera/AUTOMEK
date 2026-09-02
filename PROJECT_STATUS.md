@@ -1,4 +1,4 @@
-# Estado del Proyecto — CHECKPOINT (Fase 9: revisión final de pre-entrega COMPLETADA, pendiente decisión de deploy/limpieza DEMO)
+# Estado del Proyecto — CHECKPOINT (Fase 10: PREMIUMIZACIÓN VISUAL completa, sin deploy/push todavía)
 
 **Fecha del checkpoint**: 2026-09-02
 
@@ -52,6 +52,52 @@ Al finalizar esa revisión, entregar: problemas encontrados, problemas corregido
 - Mantener Taller Mecánico/AUTOMEK en el puerto 3002 si se prueba en local; nunca tocar el proyecto "Wpp" (Wapa Pizza Party) que puede correr en el puerto 3000 en la misma máquina.
 - `.env`/`.env.local` locales tienen secretos de desarrollo (no reutilizar en producción); Vercel tiene sus propias variables de entorno configuradas por el usuario.
 - Git: working tree limpio, un solo commit pusheado a `origin/master`. Cualquier cambio de código nuevo requeriría un nuevo commit (no hay identidad global de Git configurada en esta máquina; se configuró solo local para el repo).
+
+---
+
+## FASE 10 — PREMIUMIZACIÓN VISUAL COMPLETA (sesión 2026-09-02/03)
+
+Rediseño visual integral de AUTOMEK: dark-first, estética "SaaS automotriz premium" (carbón/negro, acentos eléctricos azul/cian, ámbar para advertencias, verde/rojo para ingresos/egresos), sin tocar arquitectura, Prisma, API, autenticación ni lógica de negocio. Cada página fue reescrita solo en su capa de presentación (JSX/clases), preservando 1:1 toda la lógica de fetch, handlers, validaciones y estado existente.
+
+### Sistema de diseño creado
+- `tailwind.config.js` — paleta `carbon` (10 tonos de superficie), `brand` (azul/cian), `amber`; sombras `soft`/`elevated`/`glow`; animaciones `fade-in`/`scale-in`/`shimmer`.
+- `styles/globals.css` — tokens dark-first, scrollbar fina, reglas de impresión (`@media print` sigue forzando fondo blanco/texto negro para los PDFs, sin cambios de comportamiento), skeleton shimmer.
+- `lib/utils.ts` — helper `cn()` (clsx + tailwind-merge) y `formatCurrency`.
+- Dependencia nueva: `lucide-react` (iconografía, ya sugerida explícitamente por el usuario).
+
+### Componentes UI reutilizables (`components/ui/`)
+`Button` (variantes primary/secondary/outline/ghost/danger/success, loading state), `Card`, `Badge` (variantes semánticas neutral/brand/success/danger/warning/info), `Input`/`Textarea`/`Select`/`Label`/`FieldError`, `Table` (Table/Thead/Tbody/Tr/Th/Td), `Modal` (backdrop blur, cierre con Esc), `EmptyState`, `Skeleton`.
+
+### Componentes de layout (`components/layout/`)
+`Sidebar`/`MobileSidebar`/`SidebarContent` — navegación agrupada en **Operación / Administración / Control** con iconos Lucide y estado activo; `Topbar` — nombre del taller, usuario, logout; `AppShell` — combina sidebar + topbar + contenido, usado por las 20 pantallas protegidas; `AuthLayout` — pantalla de login/registro con glow radial de marca; `navConfig.ts` — fuente única de la navegación.
+
+### Componentes comunes (`components/common/`)
+`PageHeader` (título + descripción + acciones), `StatCard` (KPI con ícono, tono semántico y tendencia opcional). `ToastProvider` restyleado al lenguaje dark.
+
+### Pantallas rediseñadas (24 archivos `app/**/page.tsx` + `layout.tsx`, `error.tsx`, `not-found.tsx`)
+Login, Registro, Dashboard (rehecho como centro de control: saludo, alertas dinámicas, KPIs, gráfico ingresos/egresos, órdenes por estado, objetivos, acciones rápidas, próximos turnos, vehículos frecuentes, actividad reciente — reutilizando `/api/dashboard/stats`, `/api/schedules`, `/api/work-orders` y `/api/audit-logs` ya existentes, sin endpoints nuevos), Clientes (+ detalle + cuenta corriente), Vehículos (+ historial), Presupuestos (+ detalle), Órdenes de Trabajo (+ detalle), Agenda/Turnos (calendario + detalle), Caja y Movimientos, Cierre de Caja, Deudas, Técnicos, Objetivos, Costos, Auditoría, Reportes (Mensual y P&L, con impresión intacta), y estados globales de error/404.
+
+### Detalles premium aplicados
+- Skeletons de carga en dashboard y listados (reemplazan los `"Cargando..."` de texto plano).
+- Estados vacíos con ícono, título y descripción en todas las listas.
+- Badges de estado con color semántico consistente (presupuestos, órdenes, turnos, costos, movimientos de caja).
+- Microanimaciones cortas (`fade-in`, `scale-in`, hover con `-translate-y-0.5`, transición de 150-200ms) sin exceso.
+- Modales para formularios de creación/edición (antes paneles inline) — mismo comportamiento, presentación más profesional.
+- Tablas con header en mayúsculas, hover de fila, scroll horizontal contenido en mobile (regla ya existente en `globals.css`, preservada).
+- Calendario de Agenda con día actual resaltado en azul de marca y estados con punto de color.
+
+### Verificación realizada
+- ✅ `npx tsc --noEmit` — sin errores, en cada tanda de cambios.
+- ✅ `npm run build` — **exit code 0**, 39/39 páginas generadas, únicamente warnings preexistentes de ESLint (`no-unused-vars` en catches, `exhaustive-deps`), ninguno nuevo introducido por el rediseño.
+- ✅ Verificado en navegador real (`localhost:3002`, sesión `smoketest.automek@example.com` con datos reales): login, dashboard con datos reales (KPIs, alertas, gráfico, turnos próximos), Clientes, Órdenes, Agenda (calendario), Caja y Movimientos (badges de ingreso/egreso, montos con signo) — sin errores de consola.
+- ✅ Responsive verificado en viewport móvil (375px): dashboard en 1-2 columnas sin overflow, menú lateral mobile (hamburguesa → panel deslizable) funcional.
+- ✅ Todas las funcionalidades existentes preservadas: ningún cambio en `lib/auth.ts`, `lib/db.ts`, `lib/validations.ts`, `prisma/schema.prisma`, ni en ningún `app/api/**/route.ts`.
+
+### Archivos modificados/creados
+- Modificados: los 24 `page.tsx` de rutas protegidas + auth, `app/layout.tsx`, `app/error.tsx`, `app/not-found.tsx`, `components/common/ToastProvider.tsx`, `styles/globals.css`, `tailwind.config.js`, `package.json`/`package-lock.json` (agregado `lucide-react`).
+- Creados: `lib/utils.ts`, `components/ui/{Button,Card,Badge,Input,Table,Modal,EmptyState}.tsx`, `components/layout/{Sidebar,Topbar,AppShell,AuthLayout,navConfig}.tsx`, `components/common/{PageHeader,StatCard}.tsx`.
+
+**No se hizo commit, push ni deploy en esta sesión** (según instrucción explícita). Working tree con estos cambios sin commitear.
 
 ---
 
