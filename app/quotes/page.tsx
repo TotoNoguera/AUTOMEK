@@ -16,8 +16,8 @@ import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
 
 interface QuoteItemForm {
   descripcion: string;
-  cantidad: number;
-  precioUnitario: number;
+  cantidad: string;
+  precioUnitario: string;
 }
 
 interface Quote {
@@ -61,7 +61,7 @@ export default function QuotesPage() {
   const [selectedVehicleId, setSelectedVehicleId] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [items, setItems] = useState<QuoteItemForm[]>([
-    { descripcion: "", cantidad: 1, precioUnitario: 0 },
+    { descripcion: "", cantidad: "1", precioUnitario: "0" },
   ]);
 
   useEffect(() => {
@@ -104,7 +104,7 @@ export default function QuotesPage() {
   }
 
   function addItem() {
-    setItems([...items, { descripcion: "", cantidad: 1, precioUnitario: 0 }]);
+    setItems([...items, { descripcion: "", cantidad: "1", precioUnitario: "0" }]);
   }
 
   function removeItem(index: number) {
@@ -119,7 +119,7 @@ export default function QuotesPage() {
 
   const selectedClient = clients.find((c) => c.id === selectedClientId);
   const total = items.reduce(
-    (sum, item) => sum + item.cantidad * item.precioUnitario,
+    (sum, item) => sum + (Number(item.cantidad) || 0) * (Number(item.precioUnitario) || 0),
     0
   );
 
@@ -135,8 +135,8 @@ export default function QuotesPage() {
           observaciones: observaciones || undefined,
           items: items.map((item) => ({
             descripcion: item.descripcion,
-            cantidad: Number(item.cantidad),
-            precioUnitario: Number(item.precioUnitario),
+            cantidad: Number(item.cantidad) || 1,
+            precioUnitario: Number(item.precioUnitario) || 0,
           })),
         }),
       });
@@ -145,7 +145,7 @@ export default function QuotesPage() {
         setSelectedClientId("");
         setSelectedVehicleId("");
         setObservaciones("");
-        setItems([{ descripcion: "", cantidad: 1, precioUnitario: 0 }]);
+        setItems([{ descripcion: "", cantidad: "1", precioUnitario: "0" }]);
         setShowForm(false);
         showToast("Presupuesto creado correctamente", "success");
         loadQuotes();
@@ -222,7 +222,7 @@ export default function QuotesPage() {
                     placeholder="Cant."
                     min="1"
                     value={item.cantidad}
-                    onChange={(e) => updateItem(index, "cantidad", parseInt(e.target.value) || 1)}
+                    onChange={(e) => updateItem(index, "cantidad", e.target.value)}
                     className="col-span-2"
                     required
                   />
@@ -232,7 +232,7 @@ export default function QuotesPage() {
                     min="0"
                     step="0.01"
                     value={item.precioUnitario}
-                    onChange={(e) => updateItem(index, "precioUnitario", parseFloat(e.target.value) || 0)}
+                    onChange={(e) => updateItem(index, "precioUnitario", e.target.value)}
                     className="col-span-3"
                     required
                   />

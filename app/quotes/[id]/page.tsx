@@ -34,8 +34,8 @@ interface Quote {
 
 interface QuoteItemForm {
   descripcion: string;
-  cantidad: number;
-  precioUnitario: number;
+  cantidad: string;
+  precioUnitario: string;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -79,8 +79,8 @@ export default function QuoteDetailPage() {
         setItems(
           data.items.map((item: QuoteItem) => ({
             descripcion: item.descripcion,
-            cantidad: item.cantidad,
-            precioUnitario: item.precioUnitario,
+            cantidad: String(item.cantidad),
+            precioUnitario: String(item.precioUnitario),
           }))
         );
       } else {
@@ -95,7 +95,7 @@ export default function QuoteDetailPage() {
   }
 
   function addItem() {
-    setItems([...items, { descripcion: "", cantidad: 1, precioUnitario: 0 }]);
+    setItems([...items, { descripcion: "", cantidad: "1", precioUnitario: "0" }]);
   }
 
   function removeItem(index: number) {
@@ -109,7 +109,7 @@ export default function QuoteDetailPage() {
   }
 
   const editTotal = items.reduce(
-    (sum, item) => sum + item.cantidad * item.precioUnitario,
+    (sum, item) => sum + (Number(item.cantidad) || 0) * (Number(item.precioUnitario) || 0),
     0
   );
 
@@ -126,8 +126,8 @@ export default function QuoteDetailPage() {
           observaciones: observaciones || undefined,
           items: items.map((item) => ({
             descripcion: item.descripcion,
-            cantidad: Number(item.cantidad),
-            precioUnitario: Number(item.precioUnitario),
+            cantidad: Number(item.cantidad) || 1,
+            precioUnitario: Number(item.precioUnitario) || 0,
           })),
         }),
       });
@@ -282,7 +282,7 @@ export default function QuoteDetailPage() {
                           placeholder="Cant."
                           min="1"
                           value={item.cantidad}
-                          onChange={(e) => updateItem(index, "cantidad", parseInt(e.target.value) || 1)}
+                          onChange={(e) => updateItem(index, "cantidad", e.target.value)}
                           className="col-span-2"
                           required
                         />
@@ -292,7 +292,7 @@ export default function QuoteDetailPage() {
                           min="0"
                           step="0.01"
                           value={item.precioUnitario}
-                          onChange={(e) => updateItem(index, "precioUnitario", parseFloat(e.target.value) || 0)}
+                          onChange={(e) => updateItem(index, "precioUnitario", e.target.value)}
                           className="col-span-3"
                           required
                         />

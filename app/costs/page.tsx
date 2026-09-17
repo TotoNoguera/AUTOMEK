@@ -54,14 +54,14 @@ export default function CostsPage() {
 
   const { mes: defaultMes, anio: defaultAnio } = todayMesAnio();
   const [mesFilter, setMesFilter] = useState(defaultMes);
-  const [anioFilter, setAnioFilter] = useState(defaultAnio);
+  const [anioFilter, setAnioFilter] = useState(String(defaultAnio));
 
   const [tipo, setTipo] = useState<"FIJO" | "VARIABLE">("VARIABLE");
   const [categoria, setCategoria] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [monto, setMonto] = useState("");
   const [mes, setMes] = useState(defaultMes);
-  const [anio, setAnio] = useState(defaultAnio);
+  const [anio, setAnio] = useState(String(defaultAnio));
 
   useEffect(() => {
     loadCosts();
@@ -91,7 +91,7 @@ export default function CostsPage() {
     setDescripcion("");
     setMonto("");
     setMes(defaultMes);
-    setAnio(defaultAnio);
+    setAnio(String(defaultAnio));
     setEditingId(null);
   }
 
@@ -102,7 +102,7 @@ export default function CostsPage() {
     setDescripcion(c.descripcion);
     setMonto(String(c.monto));
     setMes(c.mes);
-    setAnio(c.anio);
+    setAnio(String(c.anio));
     setShowForm(true);
   }
 
@@ -120,7 +120,7 @@ export default function CostsPage() {
           descripcion,
           monto: Number(monto),
           mes: Number(mes),
-          anio: Number(anio),
+          anio: Number(anio) || defaultAnio,
         }),
       });
       if (response.ok) {
@@ -205,7 +205,7 @@ export default function CostsPage() {
                 </option>
               ))}
             </Select>
-            <Input type="number" placeholder="Año" value={anio} onChange={(e) => setAnio(parseInt(e.target.value))} />
+            <Input type="number" placeholder="Año" value={anio} onChange={(e) => setAnio(e.target.value)} />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
@@ -224,7 +224,7 @@ export default function CostsPage() {
             </option>
           ))}
         </Select>
-        <Input type="number" value={anioFilter} onChange={(e) => setAnioFilter(parseInt(e.target.value))} />
+        <Input type="number" value={anioFilter} onChange={(e) => setAnioFilter(e.target.value)} />
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">

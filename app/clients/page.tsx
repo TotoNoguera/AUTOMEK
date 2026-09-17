@@ -14,7 +14,7 @@ import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
 import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
 
 const currentYear = new Date().getFullYear();
-const emptyVehicleForm = { patente: "", marca: "", modelo: "", anio: currentYear, kilometraje: "" };
+const emptyVehicleForm = { patente: "", marca: "", modelo: "", anio: String(currentYear), kilometraje: "" };
 
 interface Client {
   id: string;
@@ -101,7 +101,7 @@ export default function ClientsPage() {
             patente: vehicleFormData.patente.toUpperCase(),
             marca: vehicleFormData.marca,
             modelo: vehicleFormData.modelo,
-            anio: Number(vehicleFormData.anio),
+            anio: Number(vehicleFormData.anio) || currentYear,
             kilometraje: vehicleFormData.kilometraje ? Number(vehicleFormData.kilometraje) : undefined,
           }),
         });
@@ -232,7 +232,7 @@ export default function ClientsPage() {
                     id="v-anio"
                     type="number"
                     value={vehicleFormData.anio}
-                    onChange={(e) => setVehicleFormData({ ...vehicleFormData, anio: Number(e.target.value) })}
+                    onChange={(e) => setVehicleFormData({ ...vehicleFormData, anio: e.target.value })}
                     required={addVehicleNow}
                   />
                 </div>

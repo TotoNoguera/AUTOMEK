@@ -26,8 +26,8 @@ interface Schedule {
 
 interface WorkOrderItemForm {
   descripcion: string;
-  cantidad: number;
-  precioUnitario: number;
+  cantidad: string;
+  precioUnitario: string;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -66,7 +66,7 @@ export default function ScheduleDetailPage() {
 
   const [motivoIngreso, setMotivoIngreso] = useState("");
   const [items, setItems] = useState<WorkOrderItemForm[]>([
-    { descripcion: "", cantidad: 1, precioUnitario: 0 },
+    { descripcion: "", cantidad: "1", precioUnitario: "0" },
   ]);
 
   useEffect(() => {
@@ -167,7 +167,7 @@ export default function ScheduleDetailPage() {
   }
 
   function addItem() {
-    setItems([...items, { descripcion: "", cantidad: 1, precioUnitario: 0 }]);
+    setItems([...items, { descripcion: "", cantidad: "1", precioUnitario: "0" }]);
   }
 
   function removeItem(index: number) {
@@ -180,7 +180,7 @@ export default function ScheduleDetailPage() {
     setItems(newItems);
   }
 
-  const total = items.reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0);
+  const total = items.reduce((sum, item) => sum + (Number(item.cantidad) || 0) * (Number(item.precioUnitario) || 0), 0);
 
   async function convertToWorkOrder(e: React.FormEvent) {
     e.preventDefault();
@@ -192,8 +192,8 @@ export default function ScheduleDetailPage() {
           motivoIngreso,
           items: items.map((item) => ({
             descripcion: item.descripcion,
-            cantidad: Number(item.cantidad),
-            precioUnitario: Number(item.precioUnitario),
+            cantidad: Number(item.cantidad) || 1,
+            precioUnitario: Number(item.precioUnitario) || 0,
           })),
         }),
       });
@@ -333,7 +333,7 @@ export default function ScheduleDetailPage() {
                           placeholder="Cant."
                           min="1"
                           value={item.cantidad}
-                          onChange={(e) => updateItem(index, "cantidad", parseInt(e.target.value) || 1)}
+                          onChange={(e) => updateItem(index, "cantidad", e.target.value)}
                           className="col-span-2"
                           required
                         />
@@ -343,7 +343,7 @@ export default function ScheduleDetailPage() {
                           min="0"
                           step="0.01"
                           value={item.precioUnitario}
-                          onChange={(e) => updateItem(index, "precioUnitario", parseFloat(e.target.value) || 0)}
+                          onChange={(e) => updateItem(index, "precioUnitario", e.target.value)}
                           className="col-span-3"
                           required
                         />

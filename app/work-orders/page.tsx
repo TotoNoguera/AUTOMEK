@@ -33,8 +33,8 @@ interface Client {
 
 interface WorkOrderItemForm {
   descripcion: string;
-  cantidad: number;
-  precioUnitario: number;
+  cantidad: string;
+  precioUnitario: string;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -69,7 +69,7 @@ export default function WorkOrdersPage() {
   const [observaciones, setObservaciones] = useState("");
   const [kmIngreso, setKmIngreso] = useState("");
   const [items, setItems] = useState<WorkOrderItemForm[]>([
-    { descripcion: "", cantidad: 1, precioUnitario: 0 },
+    { descripcion: "", cantidad: "1", precioUnitario: "0" },
   ]);
 
   useEffect(() => {
@@ -112,7 +112,7 @@ export default function WorkOrdersPage() {
   }
 
   function addItem() {
-    setItems([...items, { descripcion: "", cantidad: 1, precioUnitario: 0 }]);
+    setItems([...items, { descripcion: "", cantidad: "1", precioUnitario: "0" }]);
   }
 
   function removeItem(index: number) {
@@ -134,7 +134,7 @@ export default function WorkOrdersPage() {
     setSelectedVehicleId(vehicle.id);
   }
   const total = items.reduce(
-    (sum, item) => sum + item.cantidad * item.precioUnitario,
+    (sum, item) => sum + (Number(item.cantidad) || 0) * (Number(item.precioUnitario) || 0),
     0
   );
 
@@ -153,8 +153,8 @@ export default function WorkOrdersPage() {
           kmIngreso: kmIngreso ? parseInt(kmIngreso) : undefined,
           items: items.map((item) => ({
             descripcion: item.descripcion,
-            cantidad: Number(item.cantidad),
-            precioUnitario: Number(item.precioUnitario),
+            cantidad: Number(item.cantidad) || 1,
+            precioUnitario: Number(item.precioUnitario) || 0,
           })),
         }),
       });
@@ -166,7 +166,7 @@ export default function WorkOrdersPage() {
         setDiagnostico("");
         setObservaciones("");
         setKmIngreso("");
-        setItems([{ descripcion: "", cantidad: 1, precioUnitario: 0 }]);
+        setItems([{ descripcion: "", cantidad: "1", precioUnitario: "0" }]);
         setShowForm(false);
         showToast("Orden de trabajo creada correctamente", "success");
         loadWorkOrders();
@@ -263,7 +263,7 @@ export default function WorkOrdersPage() {
                     placeholder="Cant."
                     min="1"
                     value={item.cantidad}
-                    onChange={(e) => updateItem(index, "cantidad", parseInt(e.target.value) || 1)}
+                    onChange={(e) => updateItem(index, "cantidad", e.target.value)}
                     className="col-span-2"
                     required
                   />
@@ -273,7 +273,7 @@ export default function WorkOrdersPage() {
                     min="0"
                     step="0.01"
                     value={item.precioUnitario}
-                    onChange={(e) => updateItem(index, "precioUnitario", parseFloat(e.target.value) || 0)}
+                    onChange={(e) => updateItem(index, "precioUnitario", e.target.value)}
                     className="col-span-3"
                     required
                   />

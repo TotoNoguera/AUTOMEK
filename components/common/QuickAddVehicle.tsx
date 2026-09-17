@@ -32,10 +32,10 @@ export function QuickAddVehicle({
   const { showToast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({ patente: "", marca: "", modelo: "", anio: currentYear, kilometraje: "" });
+  const [form, setForm] = useState({ patente: "", marca: "", modelo: "", anio: String(currentYear), kilometraje: "" });
 
   function reset() {
-    setForm({ patente: "", marca: "", modelo: "", anio: currentYear, kilometraje: "" });
+    setForm({ patente: "", marca: "", modelo: "", anio: String(currentYear), kilometraje: "" });
     setExpanded(false);
   }
 
@@ -50,7 +50,7 @@ export function QuickAddVehicle({
           patente: form.patente.toUpperCase(),
           marca: form.marca,
           modelo: form.modelo,
-          anio: Number(form.anio),
+          anio: Number(form.anio) || currentYear,
           kilometraje: form.kilometraje ? Number(form.kilometraje) : undefined,
         }),
       });
@@ -108,7 +108,7 @@ export function QuickAddVehicle({
             id="qa-anio"
             type="number"
             value={form.anio}
-            onChange={(e) => setForm({ ...form, anio: Number(e.target.value) })}
+            onChange={(e) => setForm({ ...form, anio: e.target.value })}
             required
           />
         </div>

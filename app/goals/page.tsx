@@ -62,7 +62,7 @@ export default function GoalsPage() {
   const [tipo, setTipo] = useState("INGRESO_MENSUAL");
   const [objetivo, setObjetivo] = useState("");
   const [mes, setMes] = useState(now.getMonth() + 1);
-  const [anio, setAnio] = useState(now.getFullYear());
+  const [anio, setAnio] = useState(String(now.getFullYear()));
   const [notas, setNotas] = useState("");
 
   useEffect(() => {
@@ -93,7 +93,7 @@ export default function GoalsPage() {
           tipo,
           objetivo: Number(objetivo),
           mes: Number(mes),
-          anio: Number(anio),
+          anio: Number(anio) || now.getFullYear(),
           notas: notas || undefined,
         }),
       });
@@ -170,7 +170,7 @@ export default function GoalsPage() {
                 </option>
               ))}
             </Select>
-            <Input type="number" placeholder="Año" value={anio} onChange={(e) => setAnio(parseInt(e.target.value))} />
+            <Input type="number" placeholder="Año" value={anio} onChange={(e) => setAnio(e.target.value)} />
           </div>
           <Input type="text" placeholder="Notas" value={notas} onChange={(e) => setNotas(e.target.value)} />
           <div className="flex justify-end gap-2 pt-2">

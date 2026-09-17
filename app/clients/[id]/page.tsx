@@ -44,7 +44,7 @@ export default function ClientDetailPage() {
     patente: "",
     marca: "",
     modelo: "",
-    anio: new Date().getFullYear(),
+    anio: String(new Date().getFullYear()),
     kilometraje: "",
   });
 
@@ -81,7 +81,7 @@ export default function ClientDetailPage() {
           patente: formData.patente.toUpperCase(),
           marca: formData.marca,
           modelo: formData.modelo,
-          anio: parseInt(formData.anio.toString()),
+          anio: Number(formData.anio) || new Date().getFullYear(),
           kilometraje: formData.kilometraje
             ? parseInt(formData.kilometraje)
             : undefined,
@@ -93,7 +93,7 @@ export default function ClientDetailPage() {
           patente: "",
           marca: "",
           modelo: "",
-          anio: new Date().getFullYear(),
+          anio: String(new Date().getFullYear()),
           kilometraje: "",
         });
         setShowForm(false);
@@ -115,7 +115,7 @@ export default function ClientDetailPage() {
       patente: vehicle.patente,
       marca: vehicle.marca,
       modelo: vehicle.modelo,
-      anio: vehicle.anio,
+      anio: String(vehicle.anio),
       kilometraje: vehicle.kilometraje?.toString() || "",
     });
     setShowForm(true);
@@ -212,7 +212,7 @@ export default function ClientDetailPage() {
                   type="number"
                   placeholder="Año *"
                   value={formData.anio}
-                  onChange={(e) => setFormData({ ...formData, anio: parseInt(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, anio: e.target.value })}
                   required
                 />
                 <Input

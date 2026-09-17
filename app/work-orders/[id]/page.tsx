@@ -80,8 +80,8 @@ export default function WorkOrderDetailPage() {
   const [kmEgreso, setKmEgreso] = useState("");
 
   const [newItemDesc, setNewItemDesc] = useState("");
-  const [newItemCant, setNewItemCant] = useState(1);
-  const [newItemPrecio, setNewItemPrecio] = useState(0);
+  const [newItemCant, setNewItemCant] = useState("1");
+  const [newItemPrecio, setNewItemPrecio] = useState("0");
 
   useEffect(() => {
     loadWorkOrder();
@@ -173,14 +173,14 @@ export default function WorkOrderDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           descripcion: newItemDesc,
-          cantidad: Number(newItemCant),
-          precioUnitario: Number(newItemPrecio),
+          cantidad: Number(newItemCant) || 1,
+          precioUnitario: Number(newItemPrecio) || 0,
         }),
       });
       if (response.ok) {
         setNewItemDesc("");
-        setNewItemCant(1);
-        setNewItemPrecio(0);
+        setNewItemCant("1");
+        setNewItemPrecio("0");
         showToast("Trabajo agregado correctamente", "success");
         loadWorkOrder();
       } else {
@@ -429,7 +429,7 @@ export default function WorkOrderDetailPage() {
                   placeholder="Cant."
                   min="1"
                   value={newItemCant}
-                  onChange={(e) => setNewItemCant(parseInt(e.target.value) || 1)}
+                  onChange={(e) => setNewItemCant(e.target.value)}
                   className="col-span-4 sm:col-span-2"
                   required
                 />
@@ -439,7 +439,7 @@ export default function WorkOrderDetailPage() {
                   min="0"
                   step="0.01"
                   value={newItemPrecio}
-                  onChange={(e) => setNewItemPrecio(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => setNewItemPrecio(e.target.value)}
                   className="col-span-6 sm:col-span-3"
                   required
                 />

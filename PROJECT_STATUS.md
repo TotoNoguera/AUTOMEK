@@ -1,6 +1,10 @@
-# Estado del Proyecto — CHECKPOINT (Fase 12: flujo Cliente → Vehículo mejorado y verificado, sin commit/push/deploy todavía)
+# Estado del Proyecto — CHECKPOINT (Fase 13: auditoría final pre-entrega, código corregido, sin commit/push/deploy todavía)
 
-**Fecha del checkpoint**: 2026-09-02
+**Fecha del checkpoint**: 2026-09-08
+
+## Fase actual (más reciente primero)
+Fase 13 — Auditoría final de AUTOMEK antes de entregarlo a un cliente real (ver sección "FASE 13" más abajo para el detalle completo). Registro público cerrado, datos DEMO/test purgados de producción, un gap de aislamiento multi-tenant corregido, bug de inputs numéricos corregido en todos los formularios, tests y build verificados. **Cambios de código hechos pero NO commiteados ni deployados todavía**, por instrucción explícita del usuario.
+
 
 ## Fase actual
 Fase 9 — Preparación para Producción. Código completo y desplegado. **Deploy real ya realizado** (esto ya ocurrió, a diferencia de lo que decía el checkpoint anterior de esta misma fase).
@@ -1518,3 +1522,87 @@ Sin errores. Todas las rutas compilan (estáticas y dinámicas correctamente mar
 
 *Generado en: 2026-09-01*  
 *Arquitecto: Claude Code*
+
+---
+
+## FASE 13 — AUDITORÍA FINAL PRE-ENTREGA (sesión 2026-09-08)
+
+Auditoría solicitada por el usuario para dejar AUTOMEK production-ready, privado y cerrado para un único taller, antes de entregarlo a un cliente real. **No se hizo commit ni deploy** — cambios de código listos, pendientes de aprobación del usuario. La purga de datos DEMO en la base de producción/compartida (Neon) sí se ejecutó, ya que es una operación de datos, no de código/deploy, y estaba explícitamente pedida.
+
+### 1. Registro público — CERRADO
+- `POST /api/auth/register` ahora responde siempre `404` (handler reemplazado por un stub sin lógica ni acceso a DB).
+- `/auth/register` (página) ahora hace `redirect("/auth/login")` server-side — ya no existe ningún formulario de alta de cuenta accesible.
+- Se quitó el link "¿No tienes cuenta? Regístrate" y el banner "Cuenta creada exitosamente" (código muerto) de `app/auth/login/page.tsx`.
+- `middleware.ts` no requirió cambios: sigue redirigiendo `/auth/register` → `/dashboard` si ya hay sesión: ahora simplemente también redirige a login para quien no la tiene, vía la propia página.
+- **Verificado en local (puerto 3002)**: `GET /auth/register` → 307 a `/auth/login`; `POST /api/auth/register` → 404; el texto "Regístrate" no aparece en el HTML de `/auth/login`.
+
+### 2. Datos DEMO/smoke-test — PURGADOS de la base compartida (Neon)
+Se inventarió la base completa antes de tocar nada (11 usuarios totales) y se hizo un **dry-run con conteos** antes del borrado real. Se eliminaron 8 tallers completos (cascada de Prisma: clientes, vehículos, presupuestos, órdenes, turnos, caja, cierres, costos, metas, técnicos) + sus 8 usuarios, ahora huérfanos:
+- `Taller Smoke Test` (smoketest.automek@example.com) — dataset del smoke test inicial.
+- `Taller Juan`, `Taller Test 2`, `Test Taller`, `Taller B`, `Taller C`, `Taller D`, `Taller E` — residuos de sesiones de aislamiento multi-taller de fases anteriores (todas con emails `@test.com`).
+
+**Quedaron 3 usuarios en la base** (verificado post-borrado):
+- `tominoguera12@gmail.com` → "Taller TOTO" — la cuenta real del usuario. **No se tocó.**
+- `ASDD@GMAIL.COM` → "TOTO" — cuenta no reconocida como DEMO ni como la del usuario. **No se borró** (no encaja en "datos DEMO/smoke test" literalmente; requiere decisión del usuario).
+- `nicolasalvarez200781@gmail.com` → "MT Mecánica" — cuenta de un tercero real, aparentemente autorregistrada antes de que se cerrara el registro público. **No se borró**, mismo motivo.
+
+⚠️ **Acción pendiente del usuario**: decidir qué hacer con estas dos cuentas (`ASDD@GMAIL.COM` y `nicolasalvarez200781@gmail.com`) antes de la entrega — mantenerlas, contactarlas, o pedir que se eliminen explícitamente.
+
+### 3. Autenticación, autorización y aislamiento de datos
+- Revisión focalizada de los 33 archivos `app/api/**/route.ts` (vía agente de exploración de solo lectura): todas las rutas `[id]` verifican `tallerId` contra la sesión antes de leer/escribir/borrar (patrón IDOR-safe consistente).
+- **Se encontró y corrigió un gap real**: `GET /api/clients` (`app/api/clients/route.ts`) aceptaba un query param `?tallerId=` provisto por el cliente y lo usaba sin verificar que perteneciera al usuario autenticado — permitía a cualquier usuario logueado leer clientes (y sus vehículos) de **otro taller** cambiando ese parámetro. Corregido: el `tallerId` ahora se deriva siempre de `db.userTaller.findFirst({ where: { userId: session.user.id } })`, igual que en el resto de las rutas. Ningún frontend dependía del parámetro (verificado con grep), así que no hay regresión de UI.
+- Resto de rutas (incluyendo sub-rutas de work-orders, quotes, schedules, credit) confirmadas sin problemas de aislamiento.
+
+### 4-6. UX/UI, formularios, botones, estados, responsive
+- No se hizo un rediseño (ya se hizo en Fase 10); esta fue una pasada de verificación puntual sobre el bug de formularios (punto 5) y confirmación de que no se rompió nada visualmente en el flujo de build/tests.
+
+### 5. Bug de inputs numéricos (dígito `0` inicial que se borraba) — CORREGIDO en todos los formularios
+Causa raíz: estado de React tipado `number` combinado con `parseInt`/`parseFloat` aplicado en cada `onChange`, retroalimentando el valor coercionado directo al input controlado (al escribir "0" como primer carácter, `parseInt("0")` es válido pero el patrón fallaba en combinación con valores vacíos/parciales). Patrón correcto ya usado en otras partes del código: estado `string`, coerción a `Number(...)` solo al enviar el formulario, con fallback (`|| valorPorDefecto`) para no romper cálculos.
+
+Archivos corregidos (mismo patrón en todos, sin tocar validaciones ni lógica de cálculo):
+- `app/work-orders/[id]/page.tsx` (ítems de orden: cantidad, precio unitario)
+- `app/quotes/[id]/page.tsx` (ítems de presupuesto en edición)
+- `app/quotes/page.tsx` (ítems de presupuesto en alta)
+- `app/work-orders/page.tsx` (ítems de orden en alta)
+- `app/goals/page.tsx` (año de la meta)
+- `app/costs/page.tsx` (año del costo y año del filtro)
+- `components/common/QuickAddVehicle.tsx` (año del vehículo)
+- `app/clients/page.tsx` (año del vehículo, en el alta rápida "Agregar vehículo ahora")
+- `app/clients/[id]/page.tsx` (año del vehículo, alta/edición desde ficha de cliente)
+- `app/schedules/[id]/page.tsx` (ítems del formulario de conversión turno→orden: cantidad, precio unitario)
+
+Revisados y confirmados **ya seguros, sin cambios necesarios**: `app/cash-movements/page.tsx`, `app/clients/[id]/credit/page.tsx`, kilometraje en varios formularios (ya usaban estado string), y los `<Select>` de mes (usan `parseInt` pero sobre un dropdown, no un input de texto — no afectados por este bug).
+
+### 7. Textos/banners/datos de prueba visibles al cliente
+Confirmado limpio (ya verificado en Fase 10-11): sin banners de desarrollo, sin rutas de debug expuestas. El único hallazgo de este punto fue el link/banner de registro (ver punto 1).
+
+### 8. Flujos principales
+No se re-probó end-to-end manualmente en el navegador en esta sesión (el entorno de preview del navegador está apuntando a otro proyecto local en esta máquina, no a AUTOMEK). Se verificó en su lugar:
+- `npm run test` → **46/46 tests pasando**.
+- `npm run build` → **compilación exitosa**, 39 rutas generadas correctamente (estáticas + dinámicas), sin errores (solo warnings preexistentes de lint: variables `error` no usadas en catch, deps de `useEffect`).
+- Verificación HTTP directa contra el server local (puerto 3002): login carga (200), registro redirige (307), API de registro cerrada (404).
+
+### 9-10. Arquitectura y alcance
+No se tocó Prisma, el schema, ni la arquitectura. No se agregaron funcionalidades nuevas. Los únicos cambios de lógica de negocio fueron el cierre de registro (requerido por punto 1) y el fix de aislamiento en `GET /api/clients` (requerido por punto 3, y clasificable como corrección de bug de seguridad, no como funcionalidad nueva).
+
+### Resumen para el usuario
+**Corregido:**
+1. Registro público completamente cerrado (UI + API + página).
+2. 8 tallers y 8 usuarios de DEMO/test eliminados de la base compartida (con dry-run previo).
+3. Gap de aislamiento multi-tenant en `GET /api/clients` corregido (IDOR vía `tallerId` de query param).
+4. Bug de inputs numéricos (dígito `0` inicial) corregido en 10 archivos/formularios.
+
+**Verificado:**
+- 46/46 tests unitarios pasando.
+- Build de producción exitoso, sin errores.
+- Revisión de las 33 rutas API para aislamiento multi-tenant (solo 1 gap encontrado, ya corregido).
+- Endpoints de registro cerrados, confirmado con requests HTTP reales en local.
+- Inventario completo de usuarios/tallers post-limpieza (solo quedan 3 cuentas).
+
+**Pendiente:**
+- Decisión del usuario sobre las 2 cuentas de terceros no identificadas (`ASDD@GMAIL.COM`/"TOTO" y `nicolasalvarez200781@gmail.com`/"MT Mecánica").
+- Prueba manual end-to-end del flujo completo (cliente→vehículo→presupuesto→OT→agenda→cobro→caja→cuenta corriente→costos→historial) en navegador real — no se pudo hacer en esta sesión por el entorno de preview compartido con otro proyecto; recomendado antes de la entrega.
+- Confirmar que `NEXTAUTH_SECRET`/`DATABASE_URL` en Vercel siguen siendo correctos (pendiente desde Fase 9, no revisado en esta sesión).
+- Commit y deploy de estos cambios — **no realizado a propósito**, a la espera de aprobación del usuario.
+
+**¿Listo para entregar al cliente?** El código está en buen estado (tests y build ✅, registro cerrado, aislamiento corregido, datos DEMO purgados). Antes de la entrega final recomiendo: (a) decidir sobre las 2 cuentas de terceros, (b) hacer una pasada manual rápida por los flujos principales en el navegador, y (c) recién ahí commitear y deployar.
