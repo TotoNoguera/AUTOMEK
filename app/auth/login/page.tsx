@@ -3,21 +3,19 @@
 import { LoginSchema } from "@/lib/validations";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, Suspense } from "react";
+import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { Input, Label, FieldError } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 
 function LoginContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [error, setError] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
-  const [registered, setRegistered] = useState(false);
 
   const {
     register,
@@ -26,12 +24,6 @@ function LoginContent() {
   } = useForm<z.infer<typeof LoginSchema>>({
     resolver: zodResolver(LoginSchema),
   });
-
-  useEffect(() => {
-    if (searchParams.get("registered") === "true") {
-      setRegistered(true);
-    }
-  }, [searchParams]);
 
   const onSubmit = async (values: z.infer<typeof LoginSchema>) => {
     setIsLoading(true);
@@ -60,13 +52,6 @@ function LoginContent() {
   return (
     <AuthLayout title="Iniciar Sesión" subtitle="Accedé a la gestión de tu taller">
       <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
-        {registered && (
-          <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 text-sm text-emerald-300">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-            Cuenta creada exitosamente. Inicia sesión con tus credenciales.
-          </div>
-        )}
-
         {error && (
           <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-sm text-red-300">
             <AlertCircle className="h-4 w-4 shrink-0" />
@@ -89,12 +74,6 @@ function LoginContent() {
         <Button type="submit" className="w-full" size="lg" loading={isLoading}>
           {isLoading ? "Iniciando..." : "Iniciar Sesión"}
         </Button>
-
-        <p className="text-center text-sm text-carbon-400">
-          <a href="/auth/register" className="font-medium text-brand-400 hover:text-brand-300">
-            ¿No tienes cuenta? Regístrate
-          </a>
-        </p>
       </form>
     </AuthLayout>
   );

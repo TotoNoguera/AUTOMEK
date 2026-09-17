@@ -12,26 +12,21 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
-    const tallerId = searchParams.get("tallerId");
 
-    // Get user's taller if not specified
-    let userTallerId = tallerId;
-    if (!userTallerId) {
-      const userTaller = await db.userTaller.findFirst({
-        where: { userId: session.user.id },
-      });
-      if (!userTaller) {
-        return NextResponse.json(
-          { error: "User not associated with a taller" },
-          { status: 400 }
-        );
-      }
-      userTallerId = userTaller.tallerId;
+    // Get user's taller (never trust a client-supplied tallerId)
+    const userTaller = await db.userTaller.findFirst({
+      where: { userId: session.user.id },
+    });
+    if (!userTaller) {
+      return NextResponse.json(
+        { error: "User not associated with a taller" },
+        { status: 400 }
+      );
     }
 
     const clients = await db.client.findMany({
       where: {
-        tallerId: userTallerId,
+        tallerId: userTaller.tallerId,
         OR: [
           { nombre: { contains: search, mode: "insensitive" } },
           { email: { contains: search, mode: "insensitive" } },
