@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Eye, EyeOff } from "lucide-react";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { Input, Label, FieldError } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -21,6 +21,7 @@ function LoginContent() {
   const router = useRouter();
   const [error, setError] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const timedOutRef = useRef(false);
 
   const {
@@ -88,7 +89,23 @@ function LoginContent() {
 
         <div>
           <Label htmlFor="password">Contraseña</Label>
-          <Input {...register("password")} id="password" type="password" placeholder="Contraseña" />
+          <div className="relative">
+            <Input
+              {...register("password")}
+              id="password"
+              type={showPassword ? "text" : "password"}
+              placeholder="Contraseña"
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-carbon-400 hover:text-carbon-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 rounded"
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
           <FieldError>{errors.password?.message}</FieldError>
         </div>
 
