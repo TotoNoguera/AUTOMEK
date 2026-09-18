@@ -4,7 +4,7 @@ import { LoginSchema } from "@/lib/validations";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useState, Suspense } from "react";
+import { useRef, useState, Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AlertCircle } from "lucide-react";
@@ -12,10 +12,16 @@ import { AuthLayout } from "@/components/layout/AuthLayout";
 import { Input, Label, FieldError } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 
+// Backstop: signIn("credentials", { redirect: false }) puede no resolver la
+// promesa en el camino de error con la versión de next-auth en uso. Sin este
+// timeout, el botón quedaría en "Iniciando..." para siempre.
+const SIGNIN_TIMEOUT_MS = 10000;
+
 function LoginContent() {
   const router = useRouter();
   const [error, setError] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const timedOutRef = useRef(false);
 
   const {
     register,
@@ -28,6 +34,13 @@ function LoginContent() {
   const onSubmit = async (values: z.infer<typeof LoginSchema>) => {
     setIsLoading(true);
     setError("");
+    timedOutRef.current = false;
+
+    const timeoutId = setTimeout(() => {
+      timedOutRef.current = true;
+      setError("El inicio de sesión está tardando demasiado. Intentá nuevamente.");
+      setIsLoading(false);
+    }, SIGNIN_TIMEOUT_MS);
 
     try {
       const result = await signIn("credentials", {
@@ -35,8 +48,14 @@ function LoginContent() {
         password: values.password,
         redirect: false,
       });
+      clearTimeout(timeoutId);
+      if (timedOutRef.current) return; // ya se mostró el error de timeout, ignorar resolución tardía
 
-      if (!result?.ok) {
+      // No confiar solo en result.ok: con credenciales inválidas, next-auth
+      // puede devolver result.error poblado ("CredentialsSignin") junto con
+      // ok:true, lo que dejaba pasar el flujo hacia router.push("/dashboard")
+      // sin sesión real, y el botón quedaba colgado en "Iniciando...".
+      if (result?.error || !result?.ok) {
         setError("Email o contraseña incorrectos");
         setIsLoading(false);
         return;
@@ -44,6 +63,8 @@ function LoginContent() {
 
       router.push("/dashboard");
     } catch (err) {
+      clearTimeout(timeoutId);
+      if (timedOutRef.current) return;
       setError("Error de conexión");
       setIsLoading(false);
     }
