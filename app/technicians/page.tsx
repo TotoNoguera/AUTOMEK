@@ -1,5 +1,6 @@
 "use client";
 
+import { useSubmitGuard } from "@/lib/useSubmitGuard";
 import { useEffect, useState } from "react";
 import { Plus, UserCog, Pencil, Power } from "lucide-react";
 import { useToast } from "@/components/common/ToastProvider";
@@ -23,6 +24,7 @@ interface Technician {
 }
 
 export default function TechniciansPage() {
+  const { submitting, guard } = useSubmitGuard();
   const { showToast } = useToast();
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [loading, setLoading] = useState(true);
@@ -139,7 +141,7 @@ export default function TechniciansPage() {
       />
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? "Editar Técnico" : "Nuevo Técnico"}>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={guard(handleSubmit)} className="space-y-4">
           <div>
             <Label htmlFor="nombre">Nombre *</Label>
             <Input id="nombre" value={formData.nombre} onChange={(e) => setFormData({ ...formData, nombre: e.target.value })} required />
@@ -162,7 +164,7 @@ export default function TechniciansPage() {
             <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
               Cancelar
             </Button>
-            <Button type="submit">{editingId ? "Actualizar Técnico" : "Crear Técnico"}</Button>
+            <Button type="submit" loading={submitting}>{editingId ? "Actualizar Técnico" : "Crear Técnico"}</Button>
           </div>
         </form>
       </Modal>

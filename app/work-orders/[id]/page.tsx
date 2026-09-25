@@ -1,5 +1,6 @@
 "use client";
 
+import { useSubmitGuard } from "@/lib/useSubmitGuard";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -12,8 +13,10 @@ import { Input, Textarea } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
 import { Skeleton } from "@/components/ui/EmptyState";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
+import { pendingAmount } from "@/lib/money";
 import { buildWhatsAppLink, whatsAppVehiculoListo, whatsAppRecordatorioPago } from "@/lib/whatsapp";
+import { formatDateAR } from "@/lib/dates";
 
 interface WorkOrderItem {
   id: string;
@@ -24,8 +27,11 @@ interface WorkOrderItem {
 }
 
 interface Payment {
+  id?: string;
   monto: number;
   status: string;
+  fecha?: string;
+  method?: { nombre: string };
 }
 
 interface WorkOrder {
@@ -64,6 +70,7 @@ const STATUS_VARIANT: Record<string, "neutral" | "info" | "warning" | "success" 
 const STATUS_ORDER = ["PRESUPUESTA", "APROBADA", "EN_PROCESO", "TERMINADA", "ENTREGADA"];
 
 export default function WorkOrderDetailPage() {
+  const { submitting, guard } = useSubmitGuard();
   const params = useParams();
   const { showToast } = useToast();
   const workOrderId = params.id as string;
@@ -234,7 +241,7 @@ export default function WorkOrderDetailPage() {
               <div className="mb-4 flex items-start justify-between">
                 <div>
                   <h1 className="text-xl font-bold text-white">Orden #{workOrder.id.slice(-6)}</h1>
-                  <p className="text-sm text-carbon-400">{new Date(workOrder.fecha).toLocaleDateString()}</p>
+                  <p className="text-sm text-carbon-400">{formatDateAR(workOrder.fecha)}</p>
                 </div>
                 <Badge variant={STATUS_VARIANT[workOrder.status]}>{STATUS_LABELS[workOrder.status]}</Badge>
               </div>
@@ -307,7 +314,7 @@ export default function WorkOrderDetailPage() {
               })()}
 
               {editing ? (
-                <form onSubmit={handleSaveEdit} className="space-y-4 border-t border-carbon-700 pt-4">
+                <form onSubmit={guard(handleSaveEdit)} className="space-y-4 border-t border-carbon-700 pt-4">
                   <div className="grid grid-cols-2 gap-4">
                     <Input type="text" placeholder="Motivo de ingreso *" value={motivoIngreso} onChange={(e) => setMotivoIngreso(e.target.value)} required className="col-span-2" />
                     <Input type="number" placeholder="Km ingreso" value={kmIngreso} onChange={(e) => setKmIngreso(e.target.value)} />
@@ -316,7 +323,7 @@ export default function WorkOrderDetailPage() {
                   <Textarea placeholder="Diagnóstico" value={diagnostico} onChange={(e) => setDiagnostico(e.target.value)} rows={2} />
                   <Textarea placeholder="Observaciones" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} rows={2} />
                   <div className="flex gap-2">
-                    <Button type="submit" variant="success">Guardar</Button>
+                    <Button type="submit" loading={submitting} variant="success">Guardar</Button>
                     <Button type="button" variant="secondary" onClick={() => setEditing(false)}>
                       Cancelar
                     </Button>
@@ -346,9 +353,15 @@ export default function WorkOrderDetailPage() {
                       <p className="text-carbon-100">{workOrder.observaciones}</p>
                     </div>
                   )}
-                  <Button variant="secondary" className="mt-2" onClick={() => setEditing(true)}>
-                    <Pencil className="h-4 w-4" /> Editar Orden
-                  </Button>
+                  {workOrder.status === "ENTREGADA" ? (
+                    <p className="mt-2 text-xs text-carbon-400">
+                      La orden ya fue entregada y no se puede modificar. Los cobros se registran desde Caja.
+                    </p>
+                  ) : (
+                    <Button variant="secondary" className="mt-2" onClick={() => setEditing(true)}>
+                      <Pencil className="h-4 w-4" /> Editar Orden
+                    </Button>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -372,13 +385,14 @@ export default function WorkOrderDetailPage() {
                   <Tr key={item.id}>
                     <Td>{item.descripcion}</Td>
                     <Td className="text-carbon-400">{item.cantidad}</Td>
-                    <Td className="text-carbon-400">${item.precioUnitario.toFixed(2)}</Td>
-                    <Td className="font-medium">${item.subtotal.toFixed(2)}</Td>
+                    <Td className="text-carbon-400">{formatCurrency(item.precioUnitario)}</Td>
+                    <Td className="font-medium">{formatCurrency(item.subtotal)}</Td>
                     <Td>
                       <div className="flex justify-end">
                         <button
                           onClick={() => removeItem(item.id)}
                           disabled={workOrder.items.length === 1}
+                          hidden={workOrder.status === "ENTREGADA"}
                           className="inline-flex items-center gap-1 text-xs font-medium text-red-400 hover:text-red-300 disabled:opacity-30"
                         >
                           <Trash2 className="h-3.5 w-3.5" /> Quitar
@@ -394,28 +408,74 @@ export default function WorkOrderDetailPage() {
                     Total:
                   </td>
                   <td colSpan={2} className="px-4 py-3 font-bold text-white">
-                    ${workOrder.total.toFixed(2)}
+                    {formatCurrency(workOrder.total)}
                   </td>
                 </tr>
               </tfoot>
             </Table>
           </Card>
 
+          <Card className="mb-6">
+            <CardContent>
+              <h3 className="mb-3 font-semibold text-white">Pagos</h3>
+              {(() => {
+                const pagos = (workOrder.payments || []).filter((p) => p.status === "PAGADO");
+                const pagado = pagos.reduce((sum, p) => sum + p.monto, 0);
+                const pendiente = pendingAmount(workOrder.total, workOrder.payments || []);
+                return (
+                  <>
+                    <div className="mb-3 grid grid-cols-3 gap-4">
+                      <div>
+                        <span className="text-xs text-carbon-400">Total</span>
+                        <p className="font-semibold text-white">{formatCurrency(workOrder.total)}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-carbon-400">Pagado</span>
+                        <p className="font-semibold text-emerald-400">{formatCurrency(pagado)}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-carbon-400">{pendiente < -0.004 ? "A favor del cliente" : "Pendiente"}</span>
+                        <p className={`font-semibold ${pendiente > 0.004 ? "text-red-400" : "text-emerald-400"}`}>
+                          {formatCurrency(Math.abs(pendiente) <= 0.004 ? 0 : Math.abs(pendiente))}
+                        </p>
+                      </div>
+                    </div>
+                    {pagos.length === 0 ? (
+                      <p className="text-sm text-carbon-400">Todavía no hay pagos registrados. Los cobros se cargan desde Caja.</p>
+                    ) : (
+                      <ul className="divide-y divide-carbon-700 text-sm">
+                        {pagos.map((p, i) => (
+                          <li key={p.id ?? i} className="flex items-center justify-between py-2">
+                            <span className="text-carbon-300">
+                              {p.fecha ? formatDateAR(p.fecha) : ""} {p.method ? `· ${p.method.nombre}` : ""}
+                            </span>
+                            <span className="font-medium text-carbon-100">{formatCurrency(p.monto)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                );
+              })()}
+            </CardContent>
+          </Card>
+
           {workOrder.margen !== undefined && (
             <Card className="no-print mb-8">
               <CardContent className="flex items-center justify-between">
-                <span className="text-sm text-carbon-400">Margen (ingresos - costos asociados)</span>
+                <span className="text-sm text-carbon-400">Margen (total de la orden - costos asociados)</span>
                 <span className={`font-bold ${workOrder.margen >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                  ${workOrder.margen.toFixed(2)}
+                  {formatCurrency(workOrder.margen)}
                 </span>
               </CardContent>
             </Card>
           )}
 
+          {workOrder.status !== "ENTREGADA" && (
           <Card>
             <CardContent>
               <h3 className="mb-3 font-semibold text-white">Agregar Trabajo</h3>
-              <form onSubmit={addItem} className="grid grid-cols-12 gap-2">
+              <form onSubmit={guard(addItem)} className="grid grid-cols-12 gap-2">
                 <Input
                   type="text"
                   placeholder="Descripción *"
@@ -443,12 +503,13 @@ export default function WorkOrderDetailPage() {
                   className="col-span-6 sm:col-span-3"
                   required
                 />
-                <Button type="submit" className="col-span-2 sm:col-span-1 px-0">
+                <Button type="submit" loading={submitting} className="col-span-2 sm:col-span-1 px-0">
                   <Plus className="h-4 w-4" />
                 </Button>
               </form>
             </CardContent>
           </Card>
+          )}
         </>
       )}
     </AppShell>

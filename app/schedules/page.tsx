@@ -1,5 +1,7 @@
 "use client";
 
+import { useSubmitGuard } from "@/lib/useSubmitGuard";
+import { todayAR } from "@/lib/dates";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Plus, CalendarDays, Eye, Check, MessageCircle } from "lucide-react";
@@ -58,8 +60,12 @@ const STATUS_DOT: Record<string, string> = {
   COMPLETADO: "bg-emerald-400",
 };
 
+// YYYY-MM-DD con los componentes locales del Date (toISOString correría el día según la zona horaria)
 function toDateStr(d: Date) {
-  return d.toISOString().split("T")[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function startOfWeek(d: Date) {
@@ -70,17 +76,21 @@ function startOfWeek(d: Date) {
 }
 
 export default function SchedulesPage() {
+  const { submitting, guard } = useSubmitGuard();
   const { showToast } = useToast();
   const [view, setView] = useState<"mes" | "semana">("mes");
-  const [refDate, setRefDate] = useState(new Date());
+  // El calendario se dibuja recién en el navegador: el HTML del servidor no puede traer la fecha del build
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const [refDate, setRefDate] = useState(() => new Date(`${todayAR()}T12:00:00`));
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
-  const [selectedDay, setSelectedDay] = useState<string>(toDateStr(new Date()));
+  const [selectedDay, setSelectedDay] = useState<string>(todayAR());
   const [showForm, setShowForm] = useState(false);
 
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedVehicleId, setSelectedVehicleId] = useState("");
-  const [formFecha, setFormFecha] = useState(toDateStr(new Date()));
+  const [formFecha, setFormFecha] = useState(todayAR());
   const [formHora, setFormHora] = useState("09:00");
   const [formMotivo, setFormMotivo] = useState("");
 
@@ -167,7 +177,7 @@ export default function SchedulesPage() {
     );
     setSelectedVehicleId(vehicle.id);
   }
-  const todayStr = toDateStr(new Date());
+  const todayStr = todayAR();
 
   function openCreateForm(dateStr: string) {
     setFormFecha(dateStr);
@@ -248,6 +258,14 @@ export default function SchedulesPage() {
   const daysToShow = view === "mes" ? buildMonthDays() : buildWeekDays();
   const dayLabels = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
+  if (!mounted) {
+    return (
+      <AppShell>
+        <div className="h-96 w-full animate-pulse rounded-xl bg-carbon-800/50" />
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell>
       <PageHeader
@@ -261,7 +279,7 @@ export default function SchedulesPage() {
       />
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title="Nuevo Turno">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={guard(handleSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <Select
               value={selectedClientId}
@@ -307,7 +325,7 @@ export default function SchedulesPage() {
             <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
               Cancelar
             </Button>
-            <Button type="submit">Crear Turno</Button>
+            <Button type="submit" loading={submitting}>Crear Turno</Button>
           </div>
         </form>
       </Modal>
@@ -337,7 +355,7 @@ export default function SchedulesPage() {
           <button onClick={() => navigate(-1)} className="rounded-md border border-carbon-600 p-1.5 text-carbon-300 hover:bg-carbon-800 hover:text-white">
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="min-w-[9rem] text-center text-sm font-medium capitalize text-carbon-100">
+          <span className="min-w-[9rem] text-center text-sm font-medium text-carbon-100 first-letter:uppercase">
             {view === "mes" ? monthLabel : weekLabel}
           </span>
           <button onClick={() => navigate(1)} className="rounded-md border border-carbon-600 p-1.5 text-carbon-300 hover:bg-carbon-800 hover:text-white">

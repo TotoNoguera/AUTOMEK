@@ -1,5 +1,9 @@
 import { auth } from "@/lib/auth";
+import { unauthorizedResponse, noTallerResponse, validationErrorResponse } from "@/lib/api";
 import { db } from "@/lib/db";
+import { normalizeText } from "@/lib/text";
+import { logAudit } from "@/lib/audit";
+import { round2 } from "@/lib/money";
 import { QuoteSchema } from "@/lib/validations";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -7,33 +11,27 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const { searchParams } = new URL(request.url);
-    const search = searchParams.get("search") || "";
+    const search = normalizeText(searchParams.get("search"));
     const status = searchParams.get("status");
+    if (status && !["PENDIENTE", "APROBADO", "RECHAZADO"].includes(status)) {
+      return NextResponse.json({ error: "Los filtros indicados no son válidos." }, { status: 400 });
+    }
 
-    const quotes = await db.quote.findMany({
+    const allQuotes = await db.quote.findMany({
       where: {
         tallerId: userTaller.tallerId,
         ...(status ? { status: status as "PENDIENTE" | "APROBADO" | "RECHAZADO" } : {}),
-        OR: search
-          ? [
-              { client: { nombre: { contains: search, mode: "insensitive" } } },
-              { vehicle: { patente: { contains: search, mode: "insensitive" } } },
-            ]
-          : undefined,
       },
       include: {
         client: true,
@@ -42,12 +40,19 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { createdAt: "desc" },
     });
+    const quotes = search
+      ? allQuotes.filter(
+          (q) =>
+            normalizeText(q.client.nombre).includes(search) ||
+            normalizeText(q.vehicle.patente).includes(search.replace(/[s-]+/g, ""))
+        )
+      : allQuotes;
 
     return NextResponse.json(quotes, { status: 200 });
   } catch (error) {
     console.error("Quotes GET error:", error);
     return NextResponse.json(
-      { error: "Error fetching quotes" },
+      { error: "No se pudo cargar la información. Reintentá en unos segundos." },
       { status: 500 }
     );
   }
@@ -57,26 +62,20 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const body = await request.json();
     const validation = QuoteSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json(
-        { error: "Invalid data", details: validation.error.errors },
-        { status: 400 }
-      );
+      return validationErrorResponse(validation.error);
     }
 
     const { clientId, vehicleId, items, observaciones } = validation.data;
@@ -84,14 +83,14 @@ export async function POST(request: NextRequest) {
     // Verify client belongs to taller
     const client = await db.client.findUnique({ where: { id: clientId } });
     if (!client || client.tallerId !== userTaller.tallerId) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      return NextResponse.json({ error: "Cliente no encontrado." }, { status: 404 });
     }
 
     // Verify vehicle belongs to client (and thus to taller)
     const vehicle = await db.vehicle.findUnique({ where: { id: vehicleId } });
     if (!vehicle || vehicle.clientId !== clientId) {
       return NextResponse.json(
-        { error: "Vehicle not found or does not belong to client" },
+        { error: "El vehículo no existe o no pertenece a ese cliente." },
         { status: 404 }
       );
     }
@@ -100,27 +99,37 @@ export async function POST(request: NextRequest) {
       descripcion: item.descripcion,
       cantidad: item.cantidad,
       precioUnitario: item.precioUnitario,
-      subtotal: item.cantidad * item.precioUnitario,
+      subtotal: round2(item.cantidad * item.precioUnitario),
     }));
-    const total = itemsWithSubtotal.reduce((sum, item) => sum + item.subtotal, 0);
+    const total = round2(itemsWithSubtotal.reduce((sum, item) => sum + item.subtotal, 0));
 
-    const quote = await db.quote.create({
-      data: {
+    const quote = await db.$transaction(async (tx) => {
+      const created = await tx.quote.create({
+        data: {
+          tallerId: userTaller.tallerId,
+          clientId,
+          vehicleId,
+          observaciones,
+          total,
+          items: { create: itemsWithSubtotal },
+        },
+        include: { client: true, vehicle: true, items: true },
+      });
+      await logAudit(tx, {
         tallerId: userTaller.tallerId,
-        clientId,
-        vehicleId,
-        observaciones,
-        total,
-        items: { create: itemsWithSubtotal },
-      },
-      include: { client: true, vehicle: true, items: true },
+        accion: "QUOTE_CREATED",
+        entityType: "QUOTE",
+        entityId: created.id,
+        newValue: { total, items: itemsWithSubtotal.length },
+      });
+      return created;
     });
 
     return NextResponse.json(quote, { status: 201 });
   } catch (error) {
     console.error("Quotes POST error:", error);
     return NextResponse.json(
-      { error: "Error creating quote" },
+      { error: "No se pudo crear el registro. Reintentá en unos segundos." },
       { status: 500 }
     );
   }

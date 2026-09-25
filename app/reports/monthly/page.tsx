@@ -1,6 +1,9 @@
 "use client";
 
+import { formatCurrency } from "@/lib/utils";
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { formatDateAR, yearMonthAR } from "@/lib/dates";
 import { Printer } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -19,6 +22,13 @@ interface StatsData {
   objetivosMes: Array<{ tipo: string; objetivo: number; alcanzado: number; estado: string }>;
   monthlyData: Array<{ mes: number; anio: number; ingresos: number; egresos: number; ordenes: number }>;
 }
+
+const ESTADO_LABELS: Record<string, string> = {
+  EN_PROGRESO: "En progreso",
+  ALCANZADO: "Alcanzado",
+  NO_ALCANZADO: "No alcanzado",
+  CANCELADO: "Cancelado",
+};
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -51,7 +61,7 @@ export default function MonthlyReportPage() {
     load();
   }, []);
 
-  const now = new Date();
+  const nowAR = yearMonthAR();
   const current = stats?.monthlyData[stats.monthlyData.length - 1];
   const neto = stats ? stats.cobrosMes - stats.egresosMes : 0;
 
@@ -78,15 +88,16 @@ export default function MonthlyReportPage() {
         <Card>
           <CardContent>
             <h2 className="text-xl font-bold text-white">
-              Resumen Mensual — {MESES[now.getMonth()]} {now.getFullYear()}
+              Resumen Mensual — {MESES[nowAR.month - 1]} {nowAR.year}
             </h2>
-            <p className="mb-6 text-sm text-carbon-400">Generado el {now.toLocaleDateString("es-AR")}</p>
+            <p className="no-print mb-2 text-sm"><Link href="/reports/pnl" className="font-medium text-brand-400 hover:text-brand-300">Ver rentabilidad: costos vs ingresos →</Link></p>
+            <p className="mb-6 text-sm text-carbon-400">Generado el {formatDateAR(new Date())}</p>
 
             <div className="mb-8 grid grid-cols-2 gap-4">
-              <StatCard label="Ingresos del mes" value={`$${stats.cobrosMes.toFixed(2)}`} tone="success" />
-              <StatCard label="Egresos del mes" value={`$${stats.egresosMes.toFixed(2)}`} tone="danger" />
-              <StatCard label="Neto del mes" value={`$${neto.toFixed(2)}`} tone={neto >= 0 ? "success" : "danger"} />
-              <StatCard label="Deudas pendientes" value={`$${stats.deudasPendientes.toFixed(2)}`} tone="warning" />
+              <StatCard label="Ingresos de caja del mes" value={formatCurrency(stats.cobrosMes)} tone="success" />
+              <StatCard label="Egresos de caja del mes" value={formatCurrency(stats.egresosMes)} tone="danger" />
+              <StatCard label="Neto de caja (ingresos − egresos)" value={formatCurrency(neto)} tone={neto >= 0 ? "success" : "danger"} />
+              <StatCard label="Deudas pendientes" value={formatCurrency(stats.deudasPendientes)} tone="warning" />
             </div>
 
             <h3 className="mb-3 font-semibold text-white">Órdenes del mes</h3>
@@ -108,9 +119,9 @@ export default function MonthlyReportPage() {
                     {stats.objetivosMes.map((g, i) => (
                       <Tr key={i}>
                         <Td>{TIPO_LABELS[g.tipo]}</Td>
-                        <Td className="text-carbon-400">{g.objetivo}</Td>
-                        <Td className="text-carbon-400">{g.alcanzado}</Td>
-                        <Td className="text-carbon-400">{g.estado}</Td>
+                        <Td className="text-carbon-400">{g.tipo === "INGRESO_MENSUAL" ? formatCurrency(g.objetivo) : g.objetivo}</Td>
+                        <Td className="text-carbon-400">{g.tipo === "INGRESO_MENSUAL" ? formatCurrency(g.alcanzado) : g.alcanzado}</Td>
+                        <Td className="text-carbon-400">{ESTADO_LABELS[g.estado] ?? g.estado}</Td>
                       </Tr>
                     ))}
                   </Tbody>
@@ -125,7 +136,7 @@ export default function MonthlyReportPage() {
               <ul className="mb-6 list-inside list-disc text-sm text-carbon-300">
                 {stats.vehiculosFrecuentes.map((v, i) => (
                   <li key={i}>
-                    {v.patente} — {v.marca} {v.modelo} ({v.count} órdenes)
+                    {v.patente} — {v.marca} {v.modelo} ({v.count} {v.count === 1 ? "orden" : "órdenes"})
                   </li>
                 ))}
               </ul>
@@ -145,8 +156,8 @@ export default function MonthlyReportPage() {
                 {stats.monthlyData.map((m, i) => (
                   <Tr key={i}>
                     <Td>{MESES[m.mes - 1]} {m.anio}</Td>
-                    <Td className="text-emerald-400">${m.ingresos.toFixed(2)}</Td>
-                    <Td className="text-red-400">${m.egresos.toFixed(2)}</Td>
+                    <Td className="text-emerald-400">{formatCurrency(m.ingresos)}</Td>
+                    <Td className="text-red-400">{formatCurrency(m.egresos)}</Td>
                     <Td className="text-carbon-400">{m.ordenes}</Td>
                   </Tr>
                 ))}

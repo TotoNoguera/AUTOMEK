@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCurrency } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { Download, Printer } from "lucide-react";
 import { downloadCsv } from "@/lib/csv";
@@ -9,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
 import { Skeleton } from "@/components/ui/EmptyState";
+import { todayAR } from "@/lib/dates";
 
 interface MonthlyPnl {
   mes: number;
@@ -53,7 +55,7 @@ export default function PnlReportPage() {
   function exportCsv() {
     if (!data) return;
     downloadCsv(
-      `reporte-costos-ingresos-${new Date().toISOString().split("T")[0]}.csv`,
+      `reporte-costos-ingresos-${todayAR()}.csv`,
       ["Mes", "Año", "Ingresos", "Costos Fijos", "Costos Variables", "Costos Totales", "Margen"],
       data.monthlyData.map((m) => [
         MESES[m.mes - 1],
@@ -110,12 +112,12 @@ export default function PnlReportPage() {
                 {data.monthlyData.map((m, i) => (
                   <Tr key={i}>
                     <Td>{MESES[m.mes - 1]} {m.anio}</Td>
-                    <Td className="text-emerald-400">${m.ingresos.toFixed(2)}</Td>
-                    <Td className="text-carbon-400">${m.costosFijos.toFixed(2)}</Td>
-                    <Td className="text-carbon-400">${m.costosVariables.toFixed(2)}</Td>
-                    <Td className="text-red-400">${m.costos.toFixed(2)}</Td>
+                    <Td className="text-emerald-400">{formatCurrency(m.ingresos)}</Td>
+                    <Td className="text-carbon-400">{formatCurrency(m.costosFijos)}</Td>
+                    <Td className="text-carbon-400">{formatCurrency(m.costosVariables)}</Td>
+                    <Td className="text-red-400">{formatCurrency(m.costos)}</Td>
                     <Td className={`font-bold ${m.margen >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                      ${m.margen.toFixed(2)}
+                      {formatCurrency(m.margen)}
                     </Td>
                   </Tr>
                 ))}
@@ -130,7 +132,7 @@ export default function PnlReportPage() {
                 {data.costosPorCategoriaMesActual.map((c, i) => (
                   <li key={i} className="flex justify-between py-2">
                     <span>{c.categoria}</span>
-                    <span className="font-medium">${c.monto.toFixed(2)}</span>
+                    <span className="font-medium">{formatCurrency(c.monto)}</span>
                   </li>
                 ))}
               </ul>

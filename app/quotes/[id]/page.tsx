@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCurrency } from "@/lib/utils";
+import { useSubmitGuard } from "@/lib/useSubmitGuard";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -12,6 +14,7 @@ import { Input, Textarea } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
 import { Skeleton } from "@/components/ui/EmptyState";
+import { formatDateAR } from "@/lib/dates";
 
 interface QuoteItem {
   id: string;
@@ -30,6 +33,7 @@ interface Quote {
   client: { id: string; nombre: string };
   vehicle: { id: string; patente: string; marca: string; modelo: string };
   items: QuoteItem[];
+  workOrder?: { id: string } | null;
 }
 
 interface QuoteItemForm {
@@ -51,6 +55,7 @@ const STATUS_VARIANT: Record<string, "warning" | "success" | "danger"> = {
 };
 
 export default function QuoteDetailPage() {
+  const { submitting, guard } = useSubmitGuard();
   const params = useParams();
   const router = useRouter();
   const { showToast } = useToast();
@@ -218,7 +223,7 @@ export default function QuoteDetailPage() {
               <div className="mb-4 flex items-start justify-between">
                 <div>
                   <h1 className="text-xl font-bold text-white">Presupuesto #{quote.id.slice(-6)}</h1>
-                  <p className="text-sm text-carbon-400">{new Date(quote.fecha).toLocaleDateString()}</p>
+                  <p className="text-sm text-carbon-400">{formatDateAR(quote.fecha)}</p>
                 </div>
                 <Badge variant={STATUS_VARIANT[quote.status]}>{STATUS_LABELS[quote.status]}</Badge>
               </div>
@@ -236,6 +241,15 @@ export default function QuoteDetailPage() {
                 </div>
               </div>
 
+              {quote.workOrder ? (
+                <div className="no-print flex flex-wrap items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 text-sm text-emerald-300">
+                  <ArrowRightCircle className="h-4 w-4 shrink-0" />
+                  Este presupuesto ya fue convertido en la orden #{quote.workOrder.id.slice(-6)}. Ya no se puede modificar.
+                  <Link href={`/work-orders/${quote.workOrder.id}`} className="font-medium text-brand-400 hover:text-brand-300">
+                    Ver orden →
+                  </Link>
+                </div>
+              ) : (
               <div className="no-print flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" onClick={() => changeStatus("PENDIENTE")} disabled={quote.status === "PENDIENTE"}>
                   Marcar Pendiente
@@ -247,25 +261,28 @@ export default function QuoteDetailPage() {
                   Rechazar
                 </Button>
                 {quote.status === "APROBADO" && (
-                  <Button size="sm" onClick={convertToWorkOrder}>
+                  <Button size="sm" onClick={guard(convertToWorkOrder)} loading={submitting}>
                     <ArrowRightCircle className="h-3.5 w-3.5" /> Convertir a Orden de Trabajo
                   </Button>
                 )}
               </div>
+              )}
             </CardContent>
           </Card>
 
           <div className="no-print mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-white">Ítems / Trabajos</h2>
-            <Button variant="secondary" onClick={() => setEditing(!editing)}>
-              <Pencil className="h-4 w-4" /> {editing ? "Cancelar" : "Editar Presupuesto"}
-            </Button>
+            {!quote.workOrder && (
+              <Button variant="secondary" onClick={() => setEditing(!editing)}>
+                <Pencil className="h-4 w-4" /> {editing ? "Cancelar" : "Editar Presupuesto"}
+              </Button>
+            )}
           </div>
 
           {editing ? (
             <Card className="mb-8">
               <CardContent>
-                <form onSubmit={handleSaveEdit} className="space-y-4">
+                <form onSubmit={guard(handleSaveEdit)} className="space-y-4">
                   <div className="space-y-2">
                     {items.map((item, index) => (
                       <div key={index} className="grid grid-cols-12 gap-2">
@@ -314,8 +331,8 @@ export default function QuoteDetailPage() {
                   <Textarea placeholder="Observaciones" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} rows={2} />
 
                   <div className="flex items-center justify-between border-t border-carbon-700 pt-4">
-                    <p className="text-lg font-bold text-white">Total: ${editTotal.toFixed(2)}</p>
-                    <Button type="submit">Guardar Cambios</Button>
+                    <p className="text-lg font-bold text-white">Total: {formatCurrency(editTotal)}</p>
+                    <Button type="submit" loading={submitting}>Guardar Cambios</Button>
                   </div>
                 </form>
               </CardContent>
@@ -336,8 +353,8 @@ export default function QuoteDetailPage() {
                     <Tr key={item.id}>
                       <Td>{item.descripcion}</Td>
                       <Td className="text-carbon-400">{item.cantidad}</Td>
-                      <Td className="text-carbon-400">${item.precioUnitario.toFixed(2)}</Td>
-                      <Td className="font-medium">${item.subtotal.toFixed(2)}</Td>
+                      <Td className="text-carbon-400">{formatCurrency(item.precioUnitario)}</Td>
+                      <Td className="font-medium">{formatCurrency(item.subtotal)}</Td>
                     </Tr>
                   ))}
                 </Tbody>
@@ -346,7 +363,7 @@ export default function QuoteDetailPage() {
                     <td colSpan={3} className="px-4 py-3 text-right font-bold text-white">
                       Total:
                     </td>
-                    <td className="px-4 py-3 font-bold text-white">${quote.total.toFixed(2)}</td>
+                    <td className="px-4 py-3 font-bold text-white">{formatCurrency(quote.total)}</td>
                   </tr>
                 </tfoot>
               </Table>

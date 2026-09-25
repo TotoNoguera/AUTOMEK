@@ -1,5 +1,8 @@
 "use client";
 
+import { formatCurrency } from "@/lib/utils";
+import { useSubmitGuard } from "@/lib/useSubmitGuard";
+import { yearMonthAR } from "@/lib/dates";
 import { useEffect, useState } from "react";
 import { Plus, Target, X } from "lucide-react";
 import { useToast } from "@/components/common/ToastProvider";
@@ -53,16 +56,17 @@ function isMonto(tipo: string) {
 }
 
 export default function GoalsPage() {
+  const { submitting, guard } = useSubmitGuard();
   const { showToast } = useToast();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
 
-  const now = new Date();
+  const now = yearMonthAR();
   const [tipo, setTipo] = useState("INGRESO_MENSUAL");
   const [objetivo, setObjetivo] = useState("");
-  const [mes, setMes] = useState(now.getMonth() + 1);
-  const [anio, setAnio] = useState(String(now.getFullYear()));
+  const [mes, setMes] = useState(now.month);
+  const [anio, setAnio] = useState(String(now.year));
   const [notas, setNotas] = useState("");
 
   useEffect(() => {
@@ -93,7 +97,7 @@ export default function GoalsPage() {
           tipo,
           objetivo: Number(objetivo),
           mes: Number(mes),
-          anio: Number(anio) || now.getFullYear(),
+          anio: Number(anio) || now.year,
           notas: notas || undefined,
         }),
       });
@@ -145,7 +149,7 @@ export default function GoalsPage() {
       />
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title="Nueva Meta">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={guard(handleSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <Select value={tipo} onChange={(e) => setTipo(e.target.value)}>
               <option value="INGRESO_MENSUAL">Ingreso Mensual ($)</option>
@@ -177,7 +181,7 @@ export default function GoalsPage() {
             <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
               Cancelar
             </Button>
-            <Button type="submit">Crear Meta</Button>
+            <Button type="submit" loading={submitting}>Crear Meta</Button>
           </div>
         </form>
       </Modal>
@@ -210,8 +214,8 @@ export default function GoalsPage() {
                   </div>
                   <div className="mb-1.5 flex justify-between text-sm text-carbon-300">
                     <span>
-                      {isMonto(g.tipo) ? `$${g.alcanzado.toFixed(2)}` : g.alcanzado} de{" "}
-                      {isMonto(g.tipo) ? `$${g.objetivo.toFixed(2)}` : g.objetivo}
+                      {isMonto(g.tipo) ? formatCurrency(g.alcanzado) : g.alcanzado} de{" "}
+                      {isMonto(g.tipo) ? formatCurrency(g.objetivo) : g.objetivo}
                     </span>
                     <span>{pct.toFixed(0)}%</span>
                   </div>

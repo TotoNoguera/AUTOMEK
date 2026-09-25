@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { unauthorizedResponse, noTallerResponse, validationErrorResponse } from "@/lib/api";
 import { db } from "@/lib/db";
 import { GoalUpdateSchema } from "@/lib/validations";
 import { NextRequest, NextResponse } from "next/server";
@@ -11,31 +12,25 @@ export async function PUT(
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const existing = await db.goal.findUnique({ where: { id } });
     if (!existing || existing.tallerId !== userTaller.tallerId) {
-      return NextResponse.json({ error: "Goal not found" }, { status: 404 });
+      return NextResponse.json({ error: "Meta no encontrada." }, { status: 404 });
     }
 
     const body = await request.json();
     const validation = GoalUpdateSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json(
-        { error: "Invalid data", details: validation.error.errors },
-        { status: 400 }
-      );
+      return validationErrorResponse(validation.error);
     }
 
     const goal = await db.goal.update({
@@ -47,7 +42,7 @@ export async function PUT(
   } catch (error) {
     console.error("Goal PUT error:", error);
     return NextResponse.json(
-      { error: "Error updating goal" },
+      { error: "No se pudieron guardar los cambios. Reintentá en unos segundos." },
       { status: 500 }
     );
   }

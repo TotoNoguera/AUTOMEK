@@ -1,22 +1,21 @@
 import { auth } from "@/lib/auth";
+import { unauthorizedResponse, noTallerResponse } from "@/lib/api";
 import { db } from "@/lib/db";
+import { round2 } from "@/lib/money";
 import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const workOrders = await db.workOrder.findMany({
@@ -36,12 +35,12 @@ export async function GET() {
           status: wo.status,
           total: wo.total,
           pagado,
-          pendiente: wo.total - pagado,
+          pendiente: round2(wo.total - pagado),
           client: wo.client,
           vehicle: wo.vehicle,
         };
       })
-      .filter((wo) => wo.pendiente > 0.01);
+      .filter((wo) => wo.pendiente > 0.004);
 
     const negativeCredits = await db.clientCredit.findMany({
       where: { tallerId: userTaller.tallerId, saldo: { lt: 0 } },
@@ -56,7 +55,7 @@ export async function GET() {
   } catch (error) {
     console.error("Debts GET error:", error);
     return NextResponse.json(
-      { error: "Error fetching debts" },
+      { error: "No se pudo cargar la información. Reintentá en unos segundos." },
       { status: 500 }
     );
   }

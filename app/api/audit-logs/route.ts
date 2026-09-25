@@ -1,27 +1,29 @@
 import { auth } from "@/lib/auth";
+import { unauthorizedResponse, noTallerResponse } from "@/lib/api";
 import { db } from "@/lib/db";
+import { AuditAction } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const { searchParams } = new URL(request.url);
     const entityType = searchParams.get("entityType");
     const accion = searchParams.get("accion");
+    if (accion && !Object.values(AuditAction).includes(accion as AuditAction)) {
+      return NextResponse.json({ error: "Los filtros indicados no son válidos." }, { status: 400 });
+    }
 
     const logs = await db.auditLog.findMany({
       where: {
@@ -57,7 +59,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("AuditLogs GET error:", error);
     return NextResponse.json(
-      { error: "Error fetching audit logs" },
+      { error: "No se pudo cargar la información. Reintentá en unos segundos." },
       { status: 500 }
     );
   }

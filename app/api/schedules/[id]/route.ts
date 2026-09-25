@@ -1,5 +1,7 @@
 import { auth } from "@/lib/auth";
+import { unauthorizedResponse, noTallerResponse, validationErrorResponse } from "@/lib/api";
 import { db } from "@/lib/db";
+import { logAudit } from "@/lib/audit";
 import { ScheduleUpdateSchema } from "@/lib/validations";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -11,17 +13,14 @@ export async function GET(
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const schedule = await db.schedule.findUnique({
@@ -30,14 +29,14 @@ export async function GET(
     });
 
     if (!schedule || schedule.tallerId !== userTaller.tallerId) {
-      return NextResponse.json({ error: "Schedule not found" }, { status: 404 });
+      return NextResponse.json({ error: "Turno no encontrado." }, { status: 404 });
     }
 
     return NextResponse.json(schedule, { status: 200 });
   } catch (error) {
     console.error("Schedule GET error:", error);
     return NextResponse.json(
-      { error: "Error fetching schedule" },
+      { error: "No se pudo cargar la información. Reintentá en unos segundos." },
       { status: 500 }
     );
   }
@@ -51,44 +50,45 @@ export async function PUT(
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const existing = await db.schedule.findUnique({ where: { id } });
     if (!existing || existing.tallerId !== userTaller.tallerId) {
-      return NextResponse.json({ error: "Schedule not found" }, { status: 404 });
+      return NextResponse.json({ error: "Turno no encontrado." }, { status: 404 });
     }
 
     const body = await request.json();
     const validation = ScheduleUpdateSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json(
-        { error: "Invalid data", details: validation.error.errors },
-        { status: 400 }
-      );
+      return validationErrorResponse(validation.error);
     }
 
     const { clientId, vehicleId, fecha, hora, motivo, status } = validation.data;
 
+    if (existing.workOrderId && status && status !== "COMPLETADO") {
+      return NextResponse.json(
+        { error: "Este turno ya tiene una orden de trabajo asociada, por eso su estado debe seguir en Completado." },
+        { status: 409 }
+      );
+    }
+
     const client = await db.client.findUnique({ where: { id: clientId } });
     if (!client || client.tallerId !== userTaller.tallerId) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      return NextResponse.json({ error: "Cliente no encontrado." }, { status: 404 });
     }
 
     const vehicle = await db.vehicle.findUnique({ where: { id: vehicleId } });
     if (!vehicle || vehicle.clientId !== clientId) {
       return NextResponse.json(
-        { error: "Vehicle not found or does not belong to client" },
+        { error: "El vehículo no existe o no pertenece a ese cliente." },
         { status: 404 }
       );
     }
@@ -110,24 +110,37 @@ export async function PUT(
       );
     }
 
-    const schedule = await db.schedule.update({
-      where: { id },
-      data: {
-        clientId,
-        vehicleId,
-        fecha: fechaDate,
-        hora,
-        motivo,
-        ...(status ? { status } : {}),
-      },
-      include: { client: true, vehicle: true },
+    const schedule = await db.$transaction(async (tx) => {
+      const updated = await tx.schedule.update({
+        where: { id },
+        data: {
+          clientId,
+          vehicleId,
+          fecha: fechaDate,
+          hora,
+          motivo,
+          ...(status ? { status } : {}),
+        },
+        include: { client: true, vehicle: true },
+      });
+      if (status && status !== existing.status) {
+        await logAudit(tx, {
+          tallerId: userTaller.tallerId,
+          accion: "SCHEDULE_STATUS_CHANGED",
+          entityType: "SCHEDULE",
+          entityId: id,
+          oldValue: { status: existing.status },
+          newValue: { status },
+        });
+      }
+      return updated;
     });
 
     return NextResponse.json(schedule, { status: 200 });
   } catch (error) {
     console.error("Schedule PUT error:", error);
     return NextResponse.json(
-      { error: "Error updating schedule" },
+      { error: "No se pudieron guardar los cambios. Reintentá en unos segundos." },
       { status: 500 }
     );
   }
@@ -141,22 +154,19 @@ export async function DELETE(
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const existing = await db.schedule.findUnique({ where: { id } });
     if (!existing || existing.tallerId !== userTaller.tallerId) {
-      return NextResponse.json({ error: "Schedule not found" }, { status: 404 });
+      return NextResponse.json({ error: "Turno no encontrado." }, { status: 404 });
     }
 
     if (existing.workOrderId) {
@@ -172,7 +182,7 @@ export async function DELETE(
   } catch (error) {
     console.error("Schedule DELETE error:", error);
     return NextResponse.json(
-      { error: "Error deleting schedule" },
+      { error: "No se pudo eliminar el registro. Reintentá en unos segundos." },
       { status: 500 }
     );
   }

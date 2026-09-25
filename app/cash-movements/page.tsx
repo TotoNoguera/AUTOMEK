@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCurrency } from "@/lib/utils";
+import { useSubmitGuard } from "@/lib/useSubmitGuard";
 import { useEffect, useState, useCallback } from "react";
 import { Plus, Minus, Download, Wallet } from "lucide-react";
 import { useToast } from "@/components/common/ToastProvider";
@@ -14,6 +16,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
 import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/common/StatCard";
+import { formatDateAR, todayAR } from "@/lib/dates";
 
 interface PaymentMethod {
   id: string;
@@ -67,6 +70,7 @@ const EGRESO_CATEGORIAS = [
 ];
 
 export default function CashMovementsPage() {
+  const { submitting, guard } = useSubmitGuard();
   const { showToast } = useToast();
   const [movements, setMovements] = useState<CashMovement[]>([]);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
@@ -90,7 +94,7 @@ export default function CashMovementsPage() {
 
   const loadTodaySummary = useCallback(async () => {
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayAR();
       const url = new URL("/api/cash-movements", window.location.origin);
       url.searchParams.set("from", today);
       url.searchParams.set("to", today);
@@ -150,7 +154,7 @@ export default function CashMovementsPage() {
     const pagado = wo.payments
       .filter((p) => p.status === "PAGADO")
       .reduce((sum, p) => sum + p.monto, 0);
-    return wo.total - pagado;
+    return Math.round((wo.total - pagado) * 100) / 100;
   }
 
   async function handleIngresoSubmit(e: React.FormEvent) {
@@ -215,10 +219,10 @@ export default function CashMovementsPage() {
 
   function exportCsv() {
     downloadCsv(
-      `movimientos-caja-${new Date().toISOString().split("T")[0]}.csv`,
+      `movimientos-caja-${todayAR()}.csv`,
       ["Fecha", "Tipo", "Categoría", "Cliente", "Vehículo", "Descripción", "Monto"],
       movements.map((m) => [
-        new Date(m.fecha).toLocaleDateString("es-AR"),
+        formatDateAR(m.fecha),
         m.tipo === "INGRESO" ? "Ingreso" : "Egreso",
         CATEGORIA_LABELS[m.categoria] || m.categoria,
         m.workOrder?.client.nombre || "",
@@ -248,25 +252,25 @@ export default function CashMovementsPage() {
 
       {todaySummary && (
         <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <StatCard label="Saldo Inicial (hoy)" value={`$${todaySummary.saldoInicial.toFixed(2)}`} tone="neutral" />
-          <StatCard label="Ingresos de Hoy" value={`$${todaySummary.ingresos.toFixed(2)}`} tone="success" />
-          <StatCard label="Egresos de Hoy" value={`$${todaySummary.egresos.toFixed(2)}`} tone="danger" />
+          <StatCard label="Saldo Inicial (hoy)" value={formatCurrency(todaySummary.saldoInicial)} tone="neutral" />
+          <StatCard label="Ingresos de Hoy" value={formatCurrency(todaySummary.ingresos)} tone="success" />
+          <StatCard label="Egresos de Hoy" value={formatCurrency(todaySummary.egresos)} tone="danger" />
           <StatCard
             label="Saldo Actual"
-            value={`$${(todaySummary.saldoInicial + todaySummary.ingresos - todaySummary.egresos).toFixed(2)}`}
+            value={formatCurrency((todaySummary.saldoInicial + todaySummary.ingresos - todaySummary.egresos))}
             tone="brand"
           />
         </div>
       )}
 
       <Modal open={showIngreso} onClose={() => setShowIngreso(false)} title="Registrar Ingreso">
-        <form onSubmit={handleIngresoSubmit} className="space-y-4">
+        <form onSubmit={guard(handleIngresoSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <Select value={ingresoWorkOrderId} onChange={(e) => setIngresoWorkOrderId(e.target.value)}>
               <option value="">Sin orden asociada (Anticipo)</option>
-              {workOrders.map((wo) => (
+              {workOrders.filter((wo) => pendienteDe(wo) > 0.004).map((wo) => (
                 <option key={wo.id} value={wo.id}>
-                  {wo.client.nombre} - {wo.vehicle.patente} - Pendiente: ${pendienteDe(wo).toFixed(2)}
+                  Orden #{wo.id.slice(-6)} · {wo.client.nombre} · {wo.vehicle.patente} · Pendiente: {formatCurrency(pendienteDe(wo))}
                 </option>
               ))}
             </Select>
@@ -287,13 +291,13 @@ export default function CashMovementsPage() {
             <Button type="button" variant="secondary" onClick={() => setShowIngreso(false)}>
               Cancelar
             </Button>
-            <Button type="submit" variant="success">Registrar Ingreso</Button>
+            <Button type="submit" loading={submitting} variant="success">Registrar Ingreso</Button>
           </div>
         </form>
       </Modal>
 
       <Modal open={showEgreso} onClose={() => setShowEgreso(false)} title="Registrar Egreso">
-        <form onSubmit={handleEgresoSubmit} className="space-y-4">
+        <form onSubmit={guard(handleEgresoSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <Select value={egresoCategoria} onChange={(e) => setEgresoCategoria(e.target.value)} required>
               <option value="">Categoría *</option>
@@ -310,7 +314,7 @@ export default function CashMovementsPage() {
             <Button type="button" variant="secondary" onClick={() => setShowEgreso(false)}>
               Cancelar
             </Button>
-            <Button type="submit" variant="danger">Registrar Egreso</Button>
+            <Button type="submit" loading={submitting} variant="danger">Registrar Egreso</Button>
           </div>
         </form>
       </Modal>
@@ -351,7 +355,7 @@ export default function CashMovementsPage() {
           <Tbody>
             {movements.map((m) => (
               <Tr key={m.id}>
-                <Td className="text-carbon-400">{new Date(m.fecha).toLocaleDateString("es-AR")}</Td>
+                <Td className="text-carbon-400">{formatDateAR(m.fecha)}</Td>
                 <Td>
                   <Badge variant={m.tipo === "INGRESO" ? "success" : "danger"}>{m.tipo === "INGRESO" ? "Ingreso" : "Egreso"}</Badge>
                 </Td>
@@ -359,7 +363,7 @@ export default function CashMovementsPage() {
                 <Td className="text-carbon-400">{m.workOrder ? `${m.workOrder.client.nombre} - ${m.workOrder.vehicle.patente}` : "-"}</Td>
                 <Td className="text-carbon-400">{m.descripcion || "-"}</Td>
                 <Td className={`font-semibold ${m.tipo === "INGRESO" ? "text-emerald-400" : "text-red-400"}`}>
-                  {m.tipo === "INGRESO" ? "+" : "-"}${m.monto.toFixed(2)}
+                  {m.tipo === "INGRESO" ? "+" : "-"}{formatCurrency(m.monto)}
                 </Td>
               </Tr>
             ))}

@@ -1,5 +1,7 @@
 import { auth } from "@/lib/auth";
+import { unauthorizedResponse, noTallerResponse, validationErrorResponse } from "@/lib/api";
 import { db } from "@/lib/db";
+import { round2 } from "@/lib/money";
 import { WorkOrderItemSchema } from "@/lib/validations";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -11,37 +13,37 @@ export async function POST(
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const existing = await db.workOrder.findUnique({ where: { id } });
     if (!existing || existing.tallerId !== userTaller.tallerId) {
       return NextResponse.json(
-        { error: "Work order not found" },
+        { error: "Orden de trabajo no encontrada." },
         { status: 404 }
+      );
+    }
+    if (existing.status === "ENTREGADA") {
+      return NextResponse.json(
+        { error: "La orden ya fue entregada y no se puede modificar." },
+        { status: 409 }
       );
     }
 
     const body = await request.json();
     const validation = WorkOrderItemSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json(
-        { error: "Invalid data", details: validation.error.errors },
-        { status: 400 }
-      );
+      return validationErrorResponse(validation.error);
     }
 
-    const subtotal = validation.data.cantidad * validation.data.precioUnitario;
+    const subtotal = round2(validation.data.cantidad * validation.data.precioUnitario);
 
     await db.workOrderItem.create({
       data: {
@@ -56,7 +58,7 @@ export async function POST(
     const remainingItems = await db.workOrderItem.findMany({
       where: { workOrderId: id },
     });
-    const total = remainingItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const total = round2(remainingItems.reduce((sum, item) => sum + item.subtotal, 0));
 
     const workOrder = await db.workOrder.update({
       where: { id },
@@ -68,7 +70,7 @@ export async function POST(
   } catch (error) {
     console.error("WorkOrder add-item error:", error);
     return NextResponse.json(
-      { error: "Error adding item to work order" },
+      { error: "No se pudo agregar el trabajo a la orden. Reintentá en unos segundos." },
       { status: 500 }
     );
   }

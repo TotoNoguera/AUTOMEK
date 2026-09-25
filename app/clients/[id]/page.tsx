@@ -1,5 +1,6 @@
 "use client";
 
+import { useSubmitGuard } from "@/lib/useSubmitGuard";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -32,6 +33,7 @@ interface Client {
 }
 
 export default function ClientDetailPage() {
+  const { submitting, guard } = useSubmitGuard();
   const params = useParams();
   const { showToast } = useToast();
   const clientId = params.id as string;
@@ -184,7 +186,7 @@ export default function ClientDetailPage() {
           </div>
 
           <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? "Editar Vehículo" : "Nuevo Vehículo"}>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={guard(handleSubmit)} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <Input
                   type="text"
@@ -226,7 +228,7 @@ export default function ClientDetailPage() {
                 <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit">{editingId ? "Actualizar Vehículo" : "Crear Vehículo"}</Button>
+                <Button type="submit" loading={submitting}>{editingId ? "Actualizar Vehículo" : "Crear Vehículo"}</Button>
               </div>
             </form>
           </Modal>

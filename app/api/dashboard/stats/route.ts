@@ -1,38 +1,37 @@
 import { auth } from "@/lib/auth";
+import { unauthorizedResponse, noTallerResponse } from "@/lib/api";
 import { db } from "@/lib/db";
+import { dayRangeAR, monthRangeAR, shiftMonth, todayAR, yearMonthAR } from "@/lib/dates";
+import { pendingAmount, round2 } from "@/lib/money";
 import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
     const tallerId = userTaller.tallerId;
 
-    const now = new Date();
-    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    const todayEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
-    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-    const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+    // Todo el dashboard usa el calendario argentino (hoy y mes), no el del servidor (UTC)
+    const now = yearMonthAR();
+    const { start: todayStart, end: todayEnd } = dayRangeAR(todayAR());
+    const { start: monthStart, end: monthEnd } = monthRangeAR(now.year, now.month);
 
-    const [ordenesActivas, movimientosHoy, movimientosMes, workOrders, goalsMes] =
+    const [ordenesActivas, movimientosHoy, movimientosMes, workOrders, goalsMes, negativeCredits] =
       await Promise.all([
         db.workOrder.count({
           where: { tallerId, status: { not: "ENTREGADA" } },
         }),
         db.cashMovement.findMany({
-          where: { tallerId, fecha: { gte: todayStart, lte: todayEnd } },
+          where: { tallerId, fecha: { gte: todayStart, lt: todayEnd } },
         }),
         db.cashMovement.findMany({
           where: { tallerId, fecha: { gte: monthStart, lt: monthEnd } },
@@ -42,30 +41,28 @@ export async function GET() {
           include: { payments: true, vehicle: true },
         }),
         db.goal.findMany({
-          where: { tallerId, mes: now.getUTCMonth() + 1, anio: now.getUTCFullYear() },
+          where: { tallerId, mes: now.month, anio: now.year },
+        }),
+        db.clientCredit.findMany({
+          where: { tallerId, saldo: { lt: 0 } },
+          select: { saldo: true },
         }),
       ]);
 
-    const cobrosHoy = movimientosHoy
-      .filter((m) => m.tipo === "INGRESO")
-      .reduce((s, m) => s + m.monto, 0);
-    const egresosHoy = movimientosHoy
-      .filter((m) => m.tipo === "EGRESO")
-      .reduce((s, m) => s + m.monto, 0);
-    const cobrosMes = movimientosMes
-      .filter((m) => m.tipo === "INGRESO")
-      .reduce((s, m) => s + m.monto, 0);
-    const egresosMes = movimientosMes
-      .filter((m) => m.tipo === "EGRESO")
-      .reduce((s, m) => s + m.monto, 0);
+    const sumBy = (movs: typeof movimientosHoy, tipo: "INGRESO" | "EGRESO") =>
+      round2(movs.filter((m) => m.tipo === tipo).reduce((s, m) => s + m.monto, 0));
+    const cobrosHoy = sumBy(movimientosHoy, "INGRESO");
+    const egresosHoy = sumBy(movimientosHoy, "EGRESO");
+    const cobrosMes = sumBy(movimientosMes, "INGRESO");
+    const egresosMes = sumBy(movimientosMes, "EGRESO");
 
-    const deudasPendientes = workOrders.reduce((sum, wo) => {
-      const pagado = wo.payments
-        .filter((p) => p.status === "PAGADO")
-        .reduce((s, p) => s + p.monto, 0);
-      const pendiente = wo.total - pagado;
-      return sum + (pendiente > 0.01 ? pendiente : 0);
+    // Deuda total = saldo pendiente de órdenes + cuentas corrientes en rojo (igual que la pantalla Deudas)
+    const deudaOrdenes = workOrders.reduce((sum, wo) => {
+      const pendiente = pendingAmount(wo.total, wo.payments);
+      return sum + (pendiente > 0.004 ? pendiente : 0);
     }, 0);
+    const deudaCuentaCorriente = negativeCredits.reduce((sum, c) => sum + -c.saldo, 0);
+    const deudasPendientes = round2(deudaOrdenes + deudaCuentaCorriente);
 
     const vehicleCounts = new Map<
       string,
@@ -98,9 +95,8 @@ export async function GET() {
       ordenes: number;
     }> = [];
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-      const mStart = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
-      const mEnd = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+      const d = shiftMonth(now.year, now.month, -i);
+      const { start: mStart, end: mEnd } = monthRangeAR(d.year, d.month);
 
       const [movs, ordenesCount] = await Promise.all([
         db.cashMovement.findMany({
@@ -112,10 +108,10 @@ export async function GET() {
       ]);
 
       monthlyData.push({
-        mes: d.getUTCMonth() + 1,
-        anio: d.getUTCFullYear(),
-        ingresos: movs.filter((m) => m.tipo === "INGRESO").reduce((s, m) => s + m.monto, 0),
-        egresos: movs.filter((m) => m.tipo === "EGRESO").reduce((s, m) => s + m.monto, 0),
+        mes: d.month,
+        anio: d.year,
+        ingresos: sumBy(movs, "INGRESO"),
+        egresos: sumBy(movs, "EGRESO"),
         ordenes: ordenesCount,
       });
     }
@@ -137,7 +133,7 @@ export async function GET() {
   } catch (error) {
     console.error("Dashboard stats GET error:", error);
     return NextResponse.json(
-      { error: "Error fetching dashboard stats" },
+      { error: "No se pudo cargar la información. Reintentá en unos segundos." },
       { status: 500 }
     );
   }

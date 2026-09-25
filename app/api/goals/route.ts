@@ -1,5 +1,8 @@
 import { auth } from "@/lib/auth";
+import { unauthorizedResponse, noTallerResponse, validationErrorResponse } from "@/lib/api";
 import { db } from "@/lib/db";
+import { monthRangeAR, yearMonthAR } from "@/lib/dates";
+import { round2 } from "@/lib/money";
 import { GoalSchema } from "@/lib/validations";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -9,14 +12,13 @@ async function computeAlcanzado(
   mes: number,
   anio: number
 ) {
-  const start = new Date(Date.UTC(anio, mes - 1, 1));
-  const end = new Date(Date.UTC(anio, mes, 1));
+  const { start, end } = monthRangeAR(anio, mes);
 
   if (tipo === "INGRESO_MENSUAL") {
     const movements = await db.cashMovement.findMany({
       where: { tallerId, tipo: "INGRESO", fecha: { gte: start, lt: end } },
     });
-    return movements.reduce((sum, m) => sum + m.monto, 0);
+    return round2(movements.reduce((sum, m) => sum + m.monto, 0));
   }
 
   if (tipo === "ORDENES_MENSUALES") {
@@ -39,10 +41,8 @@ function computeEstado(
 ): "EN_PROGRESO" | "ALCANZADO" | "NO_ALCANZADO" {
   if (alcanzado >= objetivo) return "ALCANZADO";
 
-  const now = new Date();
-  const monthEnded =
-    anio < now.getUTCFullYear() ||
-    (anio === now.getUTCFullYear() && mes < now.getUTCMonth() + 1);
+  const now = yearMonthAR();
+  const monthEnded = anio < now.year || (anio === now.year && mes < now.month);
 
   return monthEnded ? "NO_ALCANZADO" : "EN_PROGRESO";
 }
@@ -51,28 +51,34 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const { searchParams } = new URL(request.url);
     const mes = searchParams.get("mes");
     const anio = searchParams.get("anio");
 
+    const mesNum = mes ? Number(mes) : undefined;
+    const anioNum = anio ? Number(anio) : undefined;
+    if (
+      (mesNum !== undefined && (!Number.isInteger(mesNum) || mesNum < 1 || mesNum > 12)) ||
+      (anioNum !== undefined && (!Number.isInteger(anioNum) || anioNum < 2000 || anioNum > 2100))
+    ) {
+      return NextResponse.json({ error: "Los filtros indicados no son válidos." }, { status: 400 });
+    }
+
     const goals = await db.goal.findMany({
       where: {
         tallerId: userTaller.tallerId,
-        ...(mes ? { mes: parseInt(mes) } : {}),
-        ...(anio ? { anio: parseInt(anio) } : {}),
+        ...(mesNum ? { mes: mesNum } : {}),
+        ...(anioNum ? { anio: anioNum } : {}),
       },
       orderBy: [{ anio: "desc" }, { mes: "desc" }],
     });
@@ -101,7 +107,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Goals GET error:", error);
     return NextResponse.json(
-      { error: "Error fetching goals" },
+      { error: "No se pudo cargar la información. Reintentá en unos segundos." },
       { status: 500 }
     );
   }
@@ -111,26 +117,20 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const body = await request.json();
     const validation = GoalSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json(
-        { error: "Invalid data", details: validation.error.errors },
-        { status: 400 }
-      );
+      return validationErrorResponse(validation.error);
     }
 
     const { tipo, objetivo, mes, anio, notas } = validation.data;
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Goals POST error:", error);
     return NextResponse.json(
-      { error: "Error creating goal" },
+      { error: "No se pudo crear el registro. Reintentá en unos segundos." },
       { status: 500 }
     );
   }

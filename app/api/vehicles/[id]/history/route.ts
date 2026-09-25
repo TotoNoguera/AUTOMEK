@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { unauthorizedResponse, noTallerResponse } from "@/lib/api";
 import { db } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -10,17 +11,14 @@ export async function GET(
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const vehicle = await db.vehicle.findUnique({
@@ -28,7 +26,7 @@ export async function GET(
       include: { client: true },
     });
     if (!vehicle || vehicle.client.tallerId !== userTaller.tallerId) {
-      return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
+      return NextResponse.json({ error: "Vehículo no encontrado." }, { status: 404 });
     }
 
     const [workOrders, quotes, schedules] = await Promise.all([
@@ -55,7 +53,7 @@ export async function GET(
   } catch (error) {
     console.error("Vehicle history GET error:", error);
     return NextResponse.json(
-      { error: "Error fetching vehicle history" },
+      { error: "No se pudo cargar la información. Reintentá en unos segundos." },
       { status: 500 }
     );
   }

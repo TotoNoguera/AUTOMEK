@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCurrency } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -8,6 +9,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
+import { formatDateAR, formatDateOnly } from "@/lib/dates";
 
 interface Item {
   id: string;
@@ -155,7 +157,7 @@ export default function VehicleHistoryPage() {
                           <div className="min-w-0">
                             <p className="font-medium text-carbon-100">{wo.motivoIngreso}</p>
                             <p className="mt-0.5 flex items-center gap-2 text-sm text-carbon-400">
-                              {new Date(wo.fecha).toLocaleDateString("es-AR")} <Badge variant="neutral">{wo.status}</Badge>
+                              {formatDateAR(wo.fecha)} <Badge variant="neutral">{wo.status}</Badge>
                             </p>
                             <p className="mt-1 text-sm text-carbon-400">
                               Km ingreso/egreso: {wo.kmIngreso ?? "-"} / {wo.kmEgreso ?? "-"}
@@ -164,13 +166,13 @@ export default function VehicleHistoryPage() {
                             <ul className="mt-1 list-inside list-disc text-sm text-carbon-500">
                               {wo.items.map((item) => (
                                 <li key={item.id}>
-                                  {item.descripcion} ({item.cantidad} x ${item.precioUnitario.toFixed(2)})
+                                  {item.descripcion} ({item.cantidad} x {formatCurrency(item.precioUnitario)})
                                 </li>
                               ))}
                             </ul>
                           </div>
                           <div className="shrink-0 text-right">
-                            <p className="font-bold text-white">${wo.total.toFixed(2)}</p>
+                            <p className="font-bold text-white">{formatCurrency(wo.total)}</p>
                             <Link href={`/work-orders/${wo.id}`} className="text-sm text-brand-400 hover:text-brand-300">
                               Ver →
                             </Link>
@@ -192,10 +194,10 @@ export default function VehicleHistoryPage() {
                       <Card key={q.id}>
                         <CardContent className="flex items-center justify-between">
                           <p className="flex items-center gap-2 text-sm text-carbon-400">
-                            {new Date(q.fecha).toLocaleDateString("es-AR")} <Badge variant="neutral">{q.status}</Badge>
+                            {formatDateAR(q.fecha)} <Badge variant="neutral">{q.status}</Badge>
                           </p>
                           <div className="text-right">
-                            <p className="font-bold text-white">${q.total.toFixed(2)}</p>
+                            <p className="font-bold text-white">{formatCurrency(q.total)}</p>
                             <Link href={`/quotes/${q.id}`} className="text-sm text-brand-400 hover:text-brand-300">
                               Ver →
                             </Link>
@@ -218,7 +220,7 @@ export default function VehicleHistoryPage() {
                         <CardContent>
                           <p className="font-medium text-carbon-100">{s.motivo}</p>
                           <p className="mt-0.5 flex items-center gap-2 text-sm text-carbon-400">
-                            {new Date(s.fecha).toLocaleDateString("es-AR")} {s.hora} <Badge variant="neutral">{s.status}</Badge>
+                            {formatDateOnly(s.fecha)} {s.hora} <Badge variant="neutral">{s.status}</Badge>
                           </p>
                         </CardContent>
                       </Card>

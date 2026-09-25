@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Input";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
 import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
+import { formatDateTimeAR, todayAR } from "@/lib/dates";
 
 interface AuditLog {
   id: string;
@@ -69,10 +70,10 @@ export default function AuditLogsPage() {
 
   function exportCsv() {
     downloadCsv(
-      `auditoria-${new Date().toISOString().split("T")[0]}.csv`,
+      `auditoria-${todayAR()}.csv`,
       ["Fecha", "Acción", "Entidad", "ID Entidad", "Descripción"],
       logs.map((log) => [
-        new Date(log.timestamp).toLocaleString("es-AR"),
+        formatDateTimeAR(log.timestamp),
         ACCION_LABELS[log.accion] || log.accion,
         log.entityType,
         log.entityId,
@@ -123,7 +124,7 @@ export default function AuditLogsPage() {
           <Tbody>
             {logs.map((log) => (
               <Tr key={log.id}>
-                <Td className="whitespace-nowrap text-carbon-400">{new Date(log.timestamp).toLocaleString("es-AR")}</Td>
+                <Td className="whitespace-nowrap text-carbon-400">{formatDateTimeAR(log.timestamp)}</Td>
                 <Td className="font-medium">{ACCION_LABELS[log.accion] || log.accion}</Td>
                 <Td className="text-carbon-400">{log.entityType}</Td>
                 <Td className="text-carbon-400">{log.descripcion || log.newValue || "-"}</Td>

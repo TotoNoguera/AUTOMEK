@@ -64,6 +64,9 @@ model Taller {
   // Relaciones — Objetivos (Fase 7)
   goals       Goal[]
 
+  // Vehículos (patente única por taller)
+  vehicles    Vehicle[]
+
   // Auditoría
   auditLogs   AuditLog[]
 
@@ -116,10 +119,12 @@ model Client {
 
 model Vehicle {
   id        String     @id @default(cuid())
+  tallerId  String
+  taller    Taller     @relation(fields: [tallerId], references: [id], onDelete: Cascade)
   clientId  String
   client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
-  patente   String     @unique  // Placa/patente única
+  patente   String     // Patente normalizada (mayúsculas, sin espacios). Única por taller.
   marca     String
   modelo    String
   anio      Int
@@ -132,6 +137,7 @@ model Vehicle {
   workOrders WorkOrder[]
   schedules Schedule[]
 
+  @@unique([tallerId, patente])
   @@index([clientId])
   @@map("vehicles")
 }

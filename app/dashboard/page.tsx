@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/common/StatCard";
 import { formatCurrency } from "@/lib/utils";
+import { formatTodayLongAR, todayAR } from "@/lib/dates";
 import { buildWhatsAppLink, whatsAppConfirmTurno, whatsAppVehiculoListo, whatsAppRecordatorioPago } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
@@ -180,6 +181,13 @@ function DashboardContent() {
   const [workOrders, setWorkOrders] = useState<WorkOrderItem[] | null>(null);
   const [activity, setActivity] = useState<AuditLogItem[] | null>(null);
   const [lastVisit, setLastVisit] = useState<string | null | undefined>(undefined);
+  // La fecha se calcula recién en el navegador (hora argentina): el HTML del servidor no puede traer la fecha del build
+  const [today, setToday] = useState<string | null>(null);
+  const [todayLabel, setTodayLabel] = useState("");
+  useEffect(() => {
+    setToday(todayAR());
+    setTodayLabel(formatTodayLongAR());
+  }, []);
 
   useEffect(() => {
     async function loadAll() {
@@ -213,16 +221,14 @@ function DashboardContent() {
     }
   }, []);
 
-  const today = new Date().toISOString().slice(0, 10);
-
   const turnosHoy = (schedules || [])
-    .filter((s) => s.fecha.slice(0, 10) === today && s.status !== "CANCELADO")
+    .filter((s) => today !== null && s.fecha.slice(0, 10) === today && s.status !== "CANCELADO")
     .sort((a, b) => a.hora.localeCompare(b.hora));
 
   const turnosPorConfirmarHoy = turnosHoy.filter((s) => s.status === "PENDIENTE");
 
   const upcomingSchedules = (schedules || [])
-    .filter((s) => s.fecha.slice(0, 10) > today && s.status !== "CANCELADO" && s.status !== "COMPLETADO")
+    .filter((s) => today !== null && s.fecha.slice(0, 10) > today && s.status !== "CANCELADO" && s.status !== "COMPLETADO")
     .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora))
     .slice(0, 5);
 
@@ -286,7 +292,7 @@ function DashboardContent() {
           Hola, {session?.user?.name?.split(" ")[0] || "bienvenido"} 👋
         </h1>
         <p className="mt-1 text-sm text-carbon-400">
-          Este es tu día, {new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })}.
+          {todayLabel ? `Este es tu día, ${todayLabel}.` : " "}
         </p>
       </div>
 

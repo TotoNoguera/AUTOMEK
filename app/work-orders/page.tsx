@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCurrency } from "@/lib/utils";
+import { useSubmitGuard } from "@/lib/useSubmitGuard";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Search, Wrench, Eye, X } from "lucide-react";
@@ -14,6 +16,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
 import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
 import { QuickAddVehicle, type QuickVehicle } from "@/components/common/QuickAddVehicle";
+import { formatDateAR } from "@/lib/dates";
 
 interface WorkOrder {
   id: string;
@@ -54,6 +57,7 @@ const STATUS_VARIANT: Record<string, "neutral" | "info" | "warning" | "success" 
 };
 
 export default function WorkOrdersPage() {
+  const { submitting, guard } = useSubmitGuard();
   const { showToast } = useToast();
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -192,7 +196,7 @@ export default function WorkOrdersPage() {
       />
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title="Nueva Orden de Trabajo" className="max-w-2xl">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={guard(handleSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <Select
               value={selectedClientId}
@@ -296,8 +300,8 @@ export default function WorkOrdersPage() {
           <Textarea placeholder="Observaciones" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} rows={2} />
 
           <div className="flex items-center justify-between border-t border-carbon-700 pt-4">
-            <p className="text-lg font-bold text-white">Total: ${total.toFixed(2)}</p>
-            <Button type="submit">Crear Orden de Trabajo</Button>
+            <p className="text-lg font-bold text-white">Total: {formatCurrency(total)}</p>
+            <Button type="submit" loading={submitting}>Crear Orden de Trabajo</Button>
           </div>
         </form>
       </Modal>
@@ -352,8 +356,8 @@ export default function WorkOrdersPage() {
                 <Td className="font-medium">{wo.client.nombre}</Td>
                 <Td className="text-carbon-400">{wo.vehicle.patente}</Td>
                 <Td className="text-carbon-400">{wo.motivoIngreso}</Td>
-                <Td className="text-carbon-400">{new Date(wo.fecha).toLocaleDateString()}</Td>
-                <Td className="font-medium">${wo.total.toFixed(2)}</Td>
+                <Td className="text-carbon-400">{formatDateAR(wo.fecha)}</Td>
+                <Td className="font-medium">{formatCurrency(wo.total)}</Td>
                 <Td>
                   <Badge variant={STATUS_VARIANT[wo.status]}>{STATUS_LABELS[wo.status]}</Badge>
                 </Td>

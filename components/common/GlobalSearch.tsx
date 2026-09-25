@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, User, Car, Wrench, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { normalizeText, phoneDigits } from "@/lib/text";
 
 interface ClientResult {
   id: string;
@@ -58,9 +59,8 @@ export function GlobalSearch() {
   useEffect(() => {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 50);
-      if (clients.length === 0 && vehicles.length === 0 && workOrders.length === 0) {
-        loadAll();
-      }
+      // Se recarga cada vez que se abre: así aparecen los clientes/órdenes recién creados
+      loadAll();
     }
   }, [open]);
 
@@ -82,26 +82,30 @@ export function GlobalSearch() {
     }
   }
 
-  const q = query.trim().toLowerCase();
+  const q = normalizeText(query);
+  const qCompact = q.replace(/[s-]+/g, "");
+  const qDigits = phoneDigits(query);
+  const has = (value: string | null | undefined) => normalizeText(value).includes(q);
 
   const results: ResultItem[] = q
     ? [
         ...clients
           .filter(
             (c) =>
-              c.nombre.toLowerCase().includes(q) ||
-              (c.telefono && c.telefono.toLowerCase().includes(q)) ||
-              (c.email && c.email.toLowerCase().includes(q))
+              has(c.nombre) ||
+              has(c.telefono) ||
+              has(c.email) ||
+              (qDigits.length >= 3 && phoneDigits(c.telefono).includes(qDigits))
           )
           .slice(0, 6)
           .map((data): ResultItem => ({ type: "client", data })),
         ...vehicles
           .filter(
             (v) =>
-              v.patente.toLowerCase().includes(q) ||
-              v.marca.toLowerCase().includes(q) ||
-              v.modelo.toLowerCase().includes(q) ||
-              v.client.nombre.toLowerCase().includes(q)
+              normalizeText(v.patente).includes(qCompact) ||
+              has(v.marca) ||
+              has(v.modelo) ||
+              has(v.client.nombre)
           )
           .slice(0, 6)
           .map((data): ResultItem => ({ type: "vehicle", data })),
@@ -109,9 +113,9 @@ export function GlobalSearch() {
           .filter(
             (wo) =>
               wo.id.slice(-6).toLowerCase().includes(q) ||
-              wo.client.nombre.toLowerCase().includes(q) ||
-              wo.vehicle.patente.toLowerCase().includes(q) ||
-              wo.motivoIngreso.toLowerCase().includes(q)
+              has(wo.client.nombre) ||
+              normalizeText(wo.vehicle.patente).includes(qCompact) ||
+              has(wo.motivoIngreso)
           )
           .slice(0, 6)
           .map((data): ResultItem => ({ type: "workorder", data })),

@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { unauthorizedResponse, noTallerResponse, validationErrorResponse } from "@/lib/api";
 import { db } from "@/lib/db";
 import { CostSchema } from "@/lib/validations";
 import { NextRequest, NextResponse } from "next/server";
@@ -7,17 +8,14 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const { searchParams } = new URL(request.url);
@@ -25,11 +23,21 @@ export async function GET(request: NextRequest) {
     const anio = searchParams.get("anio");
     const tipo = searchParams.get("tipo");
 
+    const mesNum = mes ? Number(mes) : undefined;
+    const anioNum = anio ? Number(anio) : undefined;
+    if (
+      (mesNum !== undefined && (!Number.isInteger(mesNum) || mesNum < 1 || mesNum > 12)) ||
+      (anioNum !== undefined && (!Number.isInteger(anioNum) || anioNum < 2000 || anioNum > 2100)) ||
+      (tipo && tipo !== "FIJO" && tipo !== "VARIABLE")
+    ) {
+      return NextResponse.json({ error: "Los filtros indicados no son válidos." }, { status: 400 });
+    }
+
     const costs = await db.cost.findMany({
       where: {
         tallerId: userTaller.tallerId,
-        ...(mes ? { mes: parseInt(mes) } : {}),
-        ...(anio ? { anio: parseInt(anio) } : {}),
+        ...(mesNum ? { mes: mesNum } : {}),
+        ...(anioNum ? { anio: anioNum } : {}),
         ...(tipo ? { tipo: tipo as "FIJO" | "VARIABLE" } : {}),
       },
       orderBy: [{ anio: "desc" }, { mes: "desc" }, { createdAt: "desc" }],
@@ -39,7 +47,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Costs GET error:", error);
     return NextResponse.json(
-      { error: "Error fetching costs" },
+      { error: "No se pudo cargar la información. Reintentá en unos segundos." },
       { status: 500 }
     );
   }
@@ -49,26 +57,20 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const body = await request.json();
     const validation = CostSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json(
-        { error: "Invalid data", details: validation.error.errors },
-        { status: 400 }
-      );
+      return validationErrorResponse(validation.error);
     }
 
     const { workOrderId } = validation.data;
@@ -76,7 +78,7 @@ export async function POST(request: NextRequest) {
       const workOrder = await db.workOrder.findUnique({ where: { id: workOrderId } });
       if (!workOrder || workOrder.tallerId !== userTaller.tallerId) {
         return NextResponse.json(
-          { error: "Work order not found" },
+          { error: "Orden de trabajo no encontrada." },
           { status: 404 }
         );
       }
@@ -93,7 +95,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Costs POST error:", error);
     return NextResponse.json(
-      { error: "Error creating cost" },
+      { error: "No se pudo crear el registro. Reintentá en unos segundos." },
       { status: 500 }
     );
   }

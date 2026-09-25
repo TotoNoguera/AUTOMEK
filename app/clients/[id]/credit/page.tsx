@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCurrency } from "@/lib/utils";
+import { useSubmitGuard } from "@/lib/useSubmitGuard";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -24,6 +26,7 @@ interface Client {
 }
 
 export default function ClientCreditPage() {
+  const { submitting, guard } = useSubmitGuard();
   const params = useParams();
   const { showToast } = useToast();
   const clientId = params.id as string;
@@ -99,7 +102,7 @@ export default function ClientCreditPage() {
                   <div>
                     <span className="text-xs text-carbon-400">Saldo actual</span>
                     <p className={`text-2xl font-bold ${credit.saldo < 0 ? "text-red-400" : "text-emerald-400"}`}>
-                      ${credit.saldo.toFixed(2)}
+                      {formatCurrency(credit.saldo)}
                     </p>
                     <p className="text-xs text-carbon-500">
                       {credit.saldo < 0 ? "El cliente debe este monto" : "Saldo a favor del cliente"}
@@ -108,7 +111,7 @@ export default function ClientCreditPage() {
                   {credit.creditLimit != null && (
                     <div>
                       <span className="text-xs text-carbon-400">Límite de crédito</span>
-                      <p className="text-lg text-carbon-100">${credit.creditLimit.toFixed(2)}</p>
+                      <p className="text-lg text-carbon-100">{formatCurrency(credit.creditLimit)}</p>
                     </div>
                   )}
                 </div>
@@ -118,7 +121,7 @@ export default function ClientCreditPage() {
             <Card>
               <CardContent>
                 <h3 className="mb-4 font-semibold text-white">Registrar Pago</h3>
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={guard(handleSubmit)} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <Input
                       type="number"
@@ -136,7 +139,7 @@ export default function ClientCreditPage() {
                       onChange={(e) => setObservaciones(e.target.value)}
                     />
                   </div>
-                  <Button type="submit" variant="success">Registrar Pago</Button>
+                  <Button type="submit" loading={submitting} variant="success">Registrar Pago</Button>
                 </form>
               </CardContent>
             </Card>

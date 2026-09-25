@@ -1,5 +1,7 @@
 import { auth } from "@/lib/auth";
+import { unauthorizedResponse, noTallerResponse, validationErrorResponse } from "@/lib/api";
 import { db } from "@/lib/db";
+import { isValidDateString } from "@/lib/dates";
 import { ScheduleSchema } from "@/lib/validations";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -7,17 +9,14 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const { searchParams } = new URL(request.url);
@@ -25,6 +24,16 @@ export async function GET(request: NextRequest) {
     const from = searchParams.get("from");
     const to = searchParams.get("to");
     const status = searchParams.get("status");
+
+    const validStatuses = ["PENDIENTE", "CONFIRMADO", "EN_ESPERA", "CANCELADO", "COMPLETADO"];
+    if (
+      (date && !isValidDateString(date)) ||
+      (from && !isValidDateString(from)) ||
+      (to && !isValidDateString(to)) ||
+      (status && !validStatuses.includes(status))
+    ) {
+      return NextResponse.json({ error: "Los filtros de fecha o estado no son válidos." }, { status: 400 });
+    }
 
     let fechaFilter: { gte?: Date; lte?: Date } | undefined;
     if (date) {
@@ -61,7 +70,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Schedules GET error:", error);
     return NextResponse.json(
-      { error: "Error fetching schedules" },
+      { error: "No se pudo cargar la información. Reintentá en unos segundos." },
       { status: 500 }
     );
   }
@@ -71,39 +80,33 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const body = await request.json();
     const validation = ScheduleSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json(
-        { error: "Invalid data", details: validation.error.errors },
-        { status: 400 }
-      );
+      return validationErrorResponse(validation.error);
     }
 
     const { clientId, vehicleId, fecha, hora, motivo } = validation.data;
 
     const client = await db.client.findUnique({ where: { id: clientId } });
     if (!client || client.tallerId !== userTaller.tallerId) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      return NextResponse.json({ error: "Cliente no encontrado." }, { status: 404 });
     }
 
     const vehicle = await db.vehicle.findUnique({ where: { id: vehicleId } });
     if (!vehicle || vehicle.clientId !== clientId) {
       return NextResponse.json(
-        { error: "Vehicle not found or does not belong to client" },
+        { error: "El vehículo no existe o no pertenece a ese cliente." },
         { status: 404 }
       );
     }
@@ -136,7 +139,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Schedules POST error:", error);
     return NextResponse.json(
-      { error: "Error creating schedule" },
+      { error: "No se pudo crear el registro. Reintentá en unos segundos." },
       { status: 500 }
     );
   }

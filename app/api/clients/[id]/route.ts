@@ -1,4 +1,6 @@
 import { auth } from "@/lib/auth";
+import { unauthorizedResponse, noTallerResponse, validationErrorResponse, prismaCode } from "@/lib/api";
+import { duplicateClientMessage, findDuplicateClient } from "@/lib/clients";
 import { db } from "@/lib/db";
 import { ClientSchema } from "@/lib/validations";
 import { NextRequest, NextResponse } from "next/server";
@@ -11,17 +13,14 @@ export async function GET(
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const client = await db.client.findUnique({
@@ -30,14 +29,14 @@ export async function GET(
     });
 
     if (!client || client.tallerId !== userTaller.tallerId) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      return NextResponse.json({ error: "Cliente no encontrado." }, { status: 404 });
     }
 
     return NextResponse.json(client, { status: 200 });
   } catch (error) {
     console.error("Client GET error:", error);
     return NextResponse.json(
-      { error: "Error fetching client" },
+      { error: "No se pudo cargar la información. Reintentá en unos segundos." },
       { status: 500 }
     );
   }
@@ -51,17 +50,14 @@ export async function PUT(
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     // Check ownership
@@ -69,47 +65,46 @@ export async function PUT(
       where: { id: id },
     });
     if (!existing || existing.tallerId !== userTaller.tallerId) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      return NextResponse.json({ error: "Cliente no encontrado." }, { status: 404 });
     }
 
     const body = await request.json();
     const validation = ClientSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json(
-        { error: "Invalid data", details: validation.error.errors },
-        { status: 400 }
-      );
+      return validationErrorResponse(validation.error);
     }
 
-    // Check email uniqueness (excluding self)
-    if (validation.data.email && validation.data.email !== existing.email) {
-      const duplicate = await db.client.findUnique({
-        where: {
-          tallerId_email: {
-            tallerId: userTaller.tallerId,
-            email: validation.data.email,
-          },
+    const duplicate = await findDuplicateClient(userTaller.tallerId, validation.data, id);
+    if (duplicate) {
+      return NextResponse.json({ error: duplicateClientMessage(duplicate) }, { status: 409 });
+    }
+
+    try {
+      const client = await db.client.update({
+        where: { id: id },
+        // email/teléfono vacíos se guardan como null (no como texto vacío)
+        data: {
+          nombre: validation.data.nombre,
+          telefono: validation.data.telefono ?? null,
+          email: validation.data.email ?? null,
+          direccion: validation.data.direccion ?? null,
         },
+        include: { vehicles: true },
       });
-      if (duplicate) {
+      return NextResponse.json(client, { status: 200 });
+    } catch (err) {
+      if (prismaCode(err) === "P2002") {
         return NextResponse.json(
-          { error: "Email already registered" },
+          { error: "Ya existe un cliente con ese email en tu taller." },
           { status: 409 }
         );
       }
+      throw err;
     }
-
-    const client = await db.client.update({
-      where: { id: id },
-      data: validation.data,
-      include: { vehicles: true },
-    });
-
-    return NextResponse.json(client, { status: 200 });
   } catch (error) {
     console.error("Client PUT error:", error);
     return NextResponse.json(
-      { error: "Error updating client" },
+      { error: "No se pudieron guardar los cambios. Reintentá en unos segundos." },
       { status: 500 }
     );
   }
@@ -123,35 +118,65 @@ export async function DELETE(
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const existing = await db.client.findUnique({
       where: { id: id },
     });
     if (!existing || existing.tallerId !== userTaller.tallerId) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      return NextResponse.json({ error: "Cliente no encontrado." }, { status: 404 });
     }
 
-    await db.client.delete({
-      where: { id: id },
-    });
+    const [quotes, workOrders, schedules, credit] = await Promise.all([
+      db.quote.count({ where: { clientId: id } }),
+      db.workOrder.count({ where: { clientId: id } }),
+      db.schedule.count({ where: { clientId: id } }),
+      db.clientCredit.findUnique({
+        where: { tallerId_clientId: { tallerId: userTaller.tallerId, clientId: id } },
+      }),
+    ]);
+    if (quotes + workOrders + schedules > 0) {
+      return NextResponse.json(
+        {
+          error: `No se puede eliminar el cliente porque tiene historial (${quotes} presupuesto(s), ${workOrders} orden(es), ${schedules} turno(s)). Se conserva para no perder el registro de trabajos.`,
+        },
+        { status: 409 }
+      );
+    }
+    if (credit && Math.abs(credit.saldo) > 0.004) {
+      return NextResponse.json(
+        { error: "No se puede eliminar el cliente porque tiene saldo de cuenta corriente distinto de cero." },
+        { status: 409 }
+      );
+    }
+
+    try {
+      await db.client.delete({
+        where: { id: id },
+      });
+    } catch (err) {
+      if (prismaCode(err) === "P2003" || prismaCode(err) === "P2014") {
+        return NextResponse.json(
+          { error: "No se puede eliminar el cliente porque tiene historial asociado." },
+          { status: 409 }
+        );
+      }
+      throw err;
+    }
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("Client DELETE error:", error);
     return NextResponse.json(
-      { error: "Error deleting client" },
+      { error: "No se pudo eliminar el registro. Reintentá en unos segundos." },
       { status: 500 }
     );
   }

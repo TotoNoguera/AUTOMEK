@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Input, Label } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -32,6 +32,7 @@ export function QuickAddVehicle({
   const { showToast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const busy = useRef(false);
   const [form, setForm] = useState({ patente: "", marca: "", modelo: "", anio: String(currentYear), kilometraje: "" });
 
   function reset() {
@@ -40,6 +41,8 @@ export function QuickAddVehicle({
   }
 
   async function handleCreate() {
+    if (busy.current) return;
+    busy.current = true;
     setSubmitting(true);
     try {
       const response = await fetch("/api/vehicles", {
@@ -66,6 +69,7 @@ export function QuickAddVehicle({
     } catch (error) {
       showToast("Error creando vehículo", "error");
     } finally {
+      busy.current = false;
       setSubmitting(false);
     }
   }

@@ -1,5 +1,8 @@
 "use client";
 
+import { formatCurrency } from "@/lib/utils";
+import { useSubmitGuard } from "@/lib/useSubmitGuard";
+import { yearMonthAR } from "@/lib/dates";
 import { useEffect, useState } from "react";
 import { Plus, Receipt, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/components/common/ToastProvider";
@@ -41,11 +44,12 @@ const CATEGORIAS_SUGERIDAS = [
 ];
 
 function todayMesAnio() {
-  const now = new Date();
-  return { mes: now.getMonth() + 1, anio: now.getFullYear() };
+  const now = yearMonthAR();
+  return { mes: now.month, anio: now.year };
 }
 
 export default function CostsPage() {
+  const { submitting, guard } = useSubmitGuard();
   const { showToast } = useToast();
   const [costs, setCosts] = useState<Cost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -173,7 +177,7 @@ export default function CostsPage() {
       />
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? "Editar Costo" : "Nuevo Costo"}>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={guard(handleSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Select value={tipo} onChange={(e) => setTipo(e.target.value as "FIJO" | "VARIABLE")}>
               <option value="FIJO">Fijo</option>
@@ -211,7 +215,7 @@ export default function CostsPage() {
             <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
               Cancelar
             </Button>
-            <Button type="submit">{editingId ? "Actualizar Costo" : "Registrar Costo"}</Button>
+            <Button type="submit" loading={submitting}>{editingId ? "Actualizar Costo" : "Registrar Costo"}</Button>
           </div>
         </form>
       </Modal>
@@ -228,8 +232,8 @@ export default function CostsPage() {
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <StatCard label="Costos Fijos del período" value={`$${totalFijos.toFixed(2)}`} tone="brand" />
-        <StatCard label="Costos Variables del período" value={`$${totalVariables.toFixed(2)}`} tone="warning" />
+        <StatCard label="Costos Fijos del período" value={formatCurrency(totalFijos)} tone="brand" />
+        <StatCard label="Costos Variables del período" value={formatCurrency(totalVariables)} tone="warning" />
       </div>
 
       {loading ? (
@@ -261,7 +265,7 @@ export default function CostsPage() {
                 </Td>
                 <Td className="text-carbon-400">{c.categoria}</Td>
                 <Td className="text-carbon-400">{c.descripcion}</Td>
-                <Td className="font-medium">${c.monto.toFixed(2)}</Td>
+                <Td className="font-medium">{formatCurrency(c.monto)}</Td>
                 <Td>
                   <div className="flex justify-end gap-3">
                     <button onClick={() => editCost(c)} className="inline-flex items-center gap-1 text-xs font-medium text-brand-400 hover:text-brand-300">

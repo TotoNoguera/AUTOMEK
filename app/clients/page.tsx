@@ -131,7 +131,7 @@ export default function ClientsPage() {
   }
 
   async function deleteClient(id: string) {
-    if (!confirm("¿Eliminar este cliente?")) return;
+    if (!confirm("¿Eliminar este cliente? Se eliminan también sus vehículos. Solo es posible si no tiene presupuestos, órdenes ni turnos.")) return;
     try {
       const response = await fetch(`/api/clients/${id}`, {
         method: "DELETE",
@@ -186,6 +186,7 @@ export default function ClientsPage() {
               <Input
                 id="telefono"
                 type="tel"
+                placeholder="Ej: 11 5555-1234"
                 value={formData.telefono}
                 onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
               />

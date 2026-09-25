@@ -1,5 +1,8 @@
 import { auth } from "@/lib/auth";
+import { unauthorizedResponse, noTallerResponse, validationErrorResponse, prismaCode } from "@/lib/api";
 import { db } from "@/lib/db";
+import { BusinessError, CASH_CLOSED_MESSAGE, isTodayClosed, lockClient } from "@/lib/cash";
+import { round2 } from "@/lib/money";
 import { ClientCreditPaymentSchema } from "@/lib/validations";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -11,36 +14,37 @@ export async function POST(
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const client = await db.client.findUnique({ where: { id } });
     if (!client || client.tallerId !== userTaller.tallerId) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      return NextResponse.json({ error: "Cliente no encontrado." }, { status: 404 });
     }
 
     const body = await request.json();
     const validation = ClientCreditPaymentSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json(
-        { error: "Invalid data", details: validation.error.errors },
-        { status: 400 }
-      );
+      return validationErrorResponse(validation.error);
     }
 
     const { monto, observaciones } = validation.data;
 
-    const updated = await db.$transaction(async (tx) => {
+    let updated;
+    try {
+    updated = await db.$transaction(async (tx) => {
+      if (await isTodayClosed(tx, userTaller.tallerId)) {
+        throw new BusinessError(CASH_CLOSED_MESSAGE, 409);
+      }
+      // Bloquea al cliente: pagos simultáneos de cuenta corriente se aplican de a uno sin perder saldo
+      await lockClient(tx, id);
       let credit = await tx.clientCredit.findUnique({
         where: { tallerId_clientId: { tallerId: userTaller.tallerId, clientId: id } },
       });
@@ -54,7 +58,7 @@ export async function POST(
 
       const updatedCredit = await tx.clientCredit.update({
         where: { id: credit.id },
-        data: { saldo: credit.saldo + monto },
+        data: { saldo: round2(credit.saldo + monto) },
       });
 
       const cashMovement = await tx.cashMovement.create({
@@ -75,7 +79,7 @@ export async function POST(
           entityId: updatedCredit.id,
           oldValue: JSON.stringify({ saldo: saldoAnterior }),
           newValue: JSON.stringify({ saldo: updatedCredit.saldo }),
-          descripcion: `Pago de $${monto.toFixed(2)} registrado en cuenta corriente`,
+          descripcion: `Pago de ${monto.toFixed(2)} registrado en cuenta corriente`,
         },
       });
       await tx.auditLog.create({
@@ -89,13 +93,25 @@ export async function POST(
       });
 
       return updatedCredit;
-    });
+    }, { timeout: 30000, maxWait: 20000 });
+    } catch (err) {
+      if (err instanceof BusinessError) {
+        return NextResponse.json({ error: err.message }, { status: err.status });
+      }
+      if (prismaCode(err) === "P2028" || prismaCode(err) === "P2034") {
+        return NextResponse.json(
+          { error: "Hay otra operación en curso sobre estos datos. Esperá unos segundos y reintentá." },
+          { status: 409 }
+        );
+      }
+      throw err;
+    }
 
     return NextResponse.json(updated, { status: 200 });
   } catch (error) {
     console.error("ClientCredit payment POST error:", error);
     return NextResponse.json(
-      { error: "Error registering credit payment" },
+      { error: "No se pudo registrar el pago. Reintentá en unos segundos." },
       { status: 500 }
     );
   }

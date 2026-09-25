@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCurrency } from "@/lib/utils";
+import { useSubmitGuard } from "@/lib/useSubmitGuard";
 import { useEffect, useState } from "react";
 import { Printer, Lock, History } from "lucide-react";
 import { useToast } from "@/components/common/ToastProvider";
@@ -12,6 +14,7 @@ import { Badge } from "@/components/ui/Badge";
 import { StatCard } from "@/components/common/StatCard";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
 import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
+import { formatDateOnly, todayAR } from "@/lib/dates";
 
 interface DailyClose {
   id: string;
@@ -26,10 +29,11 @@ interface DailyClose {
 }
 
 function todayStr() {
-  return new Date().toISOString().split("T")[0];
+  return todayAR();
 }
 
 export default function DailyClosesPage() {
+  const { submitting, guard } = useSubmitGuard();
   const { showToast } = useToast();
   const [closes, setCloses] = useState<DailyClose[]>([]);
   const [loading, setLoading] = useState(true);
@@ -121,7 +125,7 @@ export default function DailyClosesPage() {
       <Card className="no-print mb-8">
         <CardContent>
           <h3 className="mb-4 font-semibold text-white">Cerrar Caja</h3>
-          <form onSubmit={handleClose} className="space-y-4">
+          <form onSubmit={guard(handleClose)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
               <Input type="text" placeholder="Notas (opcional)" value={notas} onChange={(e) => setNotas(e.target.value)} />
@@ -129,17 +133,17 @@ export default function DailyClosesPage() {
 
             {preview && (
               <div className="grid grid-cols-3 gap-4">
-                <StatCard label="Ingresos del día" value={`$${preview.ingresos.toFixed(2)}`} tone="success" />
-                <StatCard label="Egresos del día" value={`$${preview.egresos.toFixed(2)}`} tone="danger" />
+                <StatCard label="Ingresos del día" value={formatCurrency(preview.ingresos)} tone="success" />
+                <StatCard label="Egresos del día" value={formatCurrency(preview.egresos)} tone="danger" />
                 <StatCard
                   label="Neto del día"
-                  value={`$${(preview.ingresos - preview.egresos).toFixed(2)}`}
+                  value={formatCurrency((preview.ingresos - preview.egresos))}
                   tone={preview.ingresos - preview.egresos >= 0 ? "brand" : "warning"}
                 />
               </div>
             )}
 
-            <Button type="submit" disabled={alreadyClosed}>
+            <Button type="submit" loading={submitting} disabled={alreadyClosed}>
               <Lock className="h-4 w-4" /> {alreadyClosed ? "Este día ya fue cerrado" : "Cerrar Caja de este Día"}
             </Button>
           </form>
@@ -169,11 +173,11 @@ export default function DailyClosesPage() {
           <Tbody>
             {closes.map((c) => (
               <Tr key={c.id}>
-                <Td className="font-medium">{new Date(c.fecha).toLocaleDateString("es-AR")}</Td>
-                <Td className="text-carbon-400">${c.saldoInicial.toFixed(2)}</Td>
-                <Td className="text-emerald-400">${c.totalIngresos.toFixed(2)}</Td>
-                <Td className="text-red-400">${c.totalEgresos.toFixed(2)}</Td>
-                <Td className="font-semibold">${c.saldoFinal.toFixed(2)}</Td>
+                <Td className="font-medium">{formatDateOnly(c.fecha)}</Td>
+                <Td className="text-carbon-400">{formatCurrency(c.saldoInicial)}</Td>
+                <Td className="text-emerald-400">{formatCurrency(c.totalIngresos)}</Td>
+                <Td className="text-red-400">{formatCurrency(c.totalEgresos)}</Td>
+                <Td className="font-semibold">{formatCurrency(c.saldoFinal)}</Td>
                 <Td>
                   <Badge variant="neutral">{c.estado}</Badge>
                 </Td>

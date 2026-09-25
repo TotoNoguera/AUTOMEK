@@ -1,5 +1,6 @@
 "use client";
 
+import { useSubmitGuard } from "@/lib/useSubmitGuard";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -11,7 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/EmptyState";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 interface Schedule {
   id: string;
@@ -49,6 +50,7 @@ const STATUS_VARIANT: Record<string, "warning" | "info" | "neutral" | "danger" |
 const STATUS_OPTIONS = ["PENDIENTE", "CONFIRMADO", "EN_ESPERA", "CANCELADO", "COMPLETADO"];
 
 export default function ScheduleDetailPage() {
+  const { submitting, guard } = useSubmitGuard();
   const params = useParams();
   const router = useRouter();
   const { showToast } = useToast();
@@ -299,13 +301,13 @@ export default function ScheduleDetailPage() {
             <Card className="mb-8">
               <CardContent>
                 <h3 className="mb-4 font-semibold text-white">Editar Turno</h3>
-                <form onSubmit={handleSaveEdit} className="space-y-4">
+                <form onSubmit={guard(handleSaveEdit)} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
                     <Input type="time" value={hora} onChange={(e) => setHora(e.target.value)} required />
                   </div>
                   <Input type="text" placeholder="Motivo *" value={motivo} onChange={(e) => setMotivo(e.target.value)} required />
-                  <Button type="submit" variant="success">Guardar Cambios</Button>
+                  <Button type="submit" loading={submitting} variant="success">Guardar Cambios</Button>
                 </form>
               </CardContent>
             </Card>
@@ -315,7 +317,7 @@ export default function ScheduleDetailPage() {
             <Card>
               <CardContent>
                 <h3 className="mb-4 font-semibold text-white">Convertir a Orden de Trabajo</h3>
-                <form onSubmit={convertToWorkOrder} className="space-y-4">
+                <form onSubmit={guard(convertToWorkOrder)} className="space-y-4">
                   <Input type="text" placeholder="Motivo de ingreso *" value={motivoIngreso} onChange={(e) => setMotivoIngreso(e.target.value)} required />
                   <div className="space-y-2">
                     {items.map((item, index) => (
@@ -362,8 +364,8 @@ export default function ScheduleDetailPage() {
                     + Agregar ítem
                   </button>
                   <div className="flex items-center justify-between border-t border-carbon-700 pt-4">
-                    <p className="text-lg font-bold text-white">Total: ${total.toFixed(2)}</p>
-                    <Button type="submit">Crear Orden de Trabajo</Button>
+                    <p className="text-lg font-bold text-white">Total: {formatCurrency(total)}</p>
+                    <Button type="submit" loading={submitting}>Crear Orden de Trabajo</Button>
                   </div>
                 </form>
               </CardContent>

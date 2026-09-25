@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCurrency } from "@/lib/utils";
+import { useSubmitGuard } from "@/lib/useSubmitGuard";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Search, FileText, Eye, X } from "lucide-react";
@@ -13,6 +15,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
 import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
+import { formatDateAR } from "@/lib/dates";
 
 interface QuoteItemForm {
   descripcion: string;
@@ -49,6 +52,7 @@ const STATUS_VARIANT: Record<string, "warning" | "success" | "danger"> = {
 };
 
 export default function QuotesPage() {
+  const { submitting, guard } = useSubmitGuard();
   const { showToast } = useToast();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -171,7 +175,7 @@ export default function QuotesPage() {
       />
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title="Nuevo Presupuesto" className="max-w-2xl">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={guard(handleSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <Select
               value={selectedClientId}
@@ -260,8 +264,8 @@ export default function QuotesPage() {
           />
 
           <div className="flex items-center justify-between border-t border-carbon-700 pt-4">
-            <p className="text-lg font-bold text-white">Total: ${total.toFixed(2)}</p>
-            <Button type="submit">Crear Presupuesto</Button>
+            <p className="text-lg font-bold text-white">Total: {formatCurrency(total)}</p>
+            <Button type="submit" loading={submitting}>Crear Presupuesto</Button>
           </div>
         </form>
       </Modal>
@@ -312,8 +316,8 @@ export default function QuotesPage() {
               <Tr key={quote.id}>
                 <Td className="font-medium">{quote.client.nombre}</Td>
                 <Td className="text-carbon-400">{quote.vehicle.patente}</Td>
-                <Td className="text-carbon-400">{new Date(quote.fecha).toLocaleDateString()}</Td>
-                <Td className="font-medium">${quote.total.toFixed(2)}</Td>
+                <Td className="text-carbon-400">{formatDateAR(quote.fecha)}</Td>
+                <Td className="font-medium">{formatCurrency(quote.total)}</Td>
                 <Td>
                   <Badge variant={STATUS_VARIANT[quote.status]}>{STATUS_LABELS[quote.status]}</Badge>
                 </Td>

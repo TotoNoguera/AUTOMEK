@@ -1,5 +1,7 @@
 import { auth } from "@/lib/auth";
+import { unauthorizedResponse, noTallerResponse, validationErrorResponse } from "@/lib/api";
 import { db } from "@/lib/db";
+import { round2 } from "@/lib/money";
 import { WorkOrderSchema } from "@/lib/validations";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -11,27 +13,24 @@ export async function GET(
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const workOrder = await db.workOrder.findUnique({
       where: { id },
-      include: { client: true, vehicle: true, items: true, payments: true },
+      include: { client: true, vehicle: true, items: true, payments: { include: { method: true }, orderBy: { fecha: "asc" } } },
     });
 
     if (!workOrder || workOrder.tallerId !== userTaller.tallerId) {
       return NextResponse.json(
-        { error: "Work order not found" },
+        { error: "Orden de trabajo no encontrada." },
         { status: 404 }
       );
     }
@@ -39,13 +38,13 @@ export async function GET(
     // Costs no tiene relación Prisma formal con WorkOrder (campo plano), se consulta aparte
     const costs = await db.cost.findMany({ where: { workOrderId: id } });
     const totalCosts = costs.reduce((sum, c) => sum + c.monto, 0);
-    const margen = workOrder.total - totalCosts;
+    const margen = round2(workOrder.total - totalCosts);
 
     return NextResponse.json({ ...workOrder, costs, margen }, { status: 200 });
   } catch (error) {
     console.error("WorkOrder GET error:", error);
     return NextResponse.json(
-      { error: "Error fetching work order" },
+      { error: "No se pudo cargar la información. Reintentá en unos segundos." },
       { status: 500 }
     );
   }
@@ -59,34 +58,34 @@ export async function PUT(
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const existing = await db.workOrder.findUnique({ where: { id } });
     if (!existing || existing.tallerId !== userTaller.tallerId) {
       return NextResponse.json(
-        { error: "Work order not found" },
+        { error: "Orden de trabajo no encontrada." },
         { status: 404 }
+      );
+    }
+    if (existing.status === "ENTREGADA") {
+      return NextResponse.json(
+        { error: "La orden ya fue entregada y no se puede modificar." },
+        { status: 409 }
       );
     }
 
     const body = await request.json();
     const validation = WorkOrderSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json(
-        { error: "Invalid data", details: validation.error.errors },
-        { status: 400 }
-      );
+      return validationErrorResponse(validation.error);
     }
 
     const {
@@ -102,13 +101,13 @@ export async function PUT(
 
     const client = await db.client.findUnique({ where: { id: clientId } });
     if (!client || client.tallerId !== userTaller.tallerId) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      return NextResponse.json({ error: "Cliente no encontrado." }, { status: 404 });
     }
 
     const vehicle = await db.vehicle.findUnique({ where: { id: vehicleId } });
     if (!vehicle || vehicle.clientId !== clientId) {
       return NextResponse.json(
-        { error: "Vehicle not found or does not belong to client" },
+        { error: "El vehículo no existe o no pertenece a ese cliente." },
         { status: 404 }
       );
     }
@@ -117,9 +116,9 @@ export async function PUT(
       descripcion: item.descripcion,
       cantidad: item.cantidad,
       precioUnitario: item.precioUnitario,
-      subtotal: item.cantidad * item.precioUnitario,
+      subtotal: round2(item.cantidad * item.precioUnitario),
     }));
-    const total = itemsWithSubtotal.reduce((sum, item) => sum + item.subtotal, 0);
+    const total = round2(itemsWithSubtotal.reduce((sum, item) => sum + item.subtotal, 0));
 
     const workOrder = await db.workOrder.update({
       where: { id },
@@ -144,7 +143,7 @@ export async function PUT(
   } catch (error) {
     console.error("WorkOrder PUT error:", error);
     return NextResponse.json(
-      { error: "Error updating work order" },
+      { error: "No se pudieron guardar los cambios. Reintentá en unos segundos." },
       { status: 500 }
     );
   }

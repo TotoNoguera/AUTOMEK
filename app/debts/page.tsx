@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCurrency } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CircleDollarSign, FileSearch, MessageCircle } from "lucide-react";
@@ -86,9 +87,9 @@ export default function DebtsPage() {
                       <Tr key={wo.id}>
                         <Td className="font-medium">{wo.client.nombre}</Td>
                         <Td className="text-carbon-400">{wo.vehicle.patente}</Td>
-                        <Td className="text-carbon-400">${wo.total.toFixed(2)}</Td>
-                        <Td className="text-emerald-400">${wo.pagado.toFixed(2)}</Td>
-                        <Td className="font-semibold text-red-400">${wo.pendiente.toFixed(2)}</Td>
+                        <Td className="text-carbon-400">{formatCurrency(wo.total)}</Td>
+                        <Td className="text-emerald-400">{formatCurrency(wo.pagado)}</Td>
+                        <Td className="font-semibold text-red-400">{formatCurrency(wo.pendiente)}</Td>
                         <Td>
                           <div className="flex justify-end gap-3">
                             {buildWhatsAppLink(wo.client.telefono, whatsAppRecordatorioPago(wo.client.nombre, wo.pendiente, `orden #${wo.id.slice(-6)}`)) && (
@@ -137,7 +138,7 @@ export default function DebtsPage() {
                     {negativeCredits.map((c) => (
                       <Tr key={c.id}>
                         <Td className="font-medium">{c.client.nombre}</Td>
-                        <Td className="font-semibold text-red-400">${c.saldo.toFixed(2)}</Td>
+                        <Td className="font-semibold text-red-400">{formatCurrency(c.saldo)}</Td>
                         <Td>
                           <div className="flex justify-end gap-3">
                             {buildWhatsAppLink(c.client.telefono, whatsAppRecordatorioPago(c.client.nombre, Math.abs(c.saldo), "cuenta corriente")) && (

@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { unauthorizedResponse, noTallerResponse, validationErrorResponse } from "@/lib/api";
 import { db } from "@/lib/db";
 import { CostSchema } from "@/lib/validations";
 import { NextRequest, NextResponse } from "next/server";
@@ -11,31 +12,25 @@ export async function PUT(
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const existing = await db.cost.findUnique({ where: { id } });
     if (!existing || existing.tallerId !== userTaller.tallerId) {
-      return NextResponse.json({ error: "Cost not found" }, { status: 404 });
+      return NextResponse.json({ error: "Costo no encontrado." }, { status: 404 });
     }
 
     const body = await request.json();
     const validation = CostSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json(
-        { error: "Invalid data", details: validation.error.errors },
-        { status: 400 }
-      );
+      return validationErrorResponse(validation.error);
     }
 
     const { workOrderId } = validation.data;
@@ -43,7 +38,7 @@ export async function PUT(
       const workOrder = await db.workOrder.findUnique({ where: { id: workOrderId } });
       if (!workOrder || workOrder.tallerId !== userTaller.tallerId) {
         return NextResponse.json(
-          { error: "Work order not found" },
+          { error: "Orden de trabajo no encontrada." },
           { status: 404 }
         );
       }
@@ -58,7 +53,7 @@ export async function PUT(
   } catch (error) {
     console.error("Cost PUT error:", error);
     return NextResponse.json(
-      { error: "Error updating cost" },
+      { error: "No se pudieron guardar los cambios. Reintentá en unos segundos." },
       { status: 500 }
     );
   }
@@ -72,22 +67,19 @@ export async function DELETE(
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const existing = await db.cost.findUnique({ where: { id } });
     if (!existing || existing.tallerId !== userTaller.tallerId) {
-      return NextResponse.json({ error: "Cost not found" }, { status: 404 });
+      return NextResponse.json({ error: "Costo no encontrado." }, { status: 404 });
     }
 
     await db.cost.delete({ where: { id } });
@@ -96,7 +88,7 @@ export async function DELETE(
   } catch (error) {
     console.error("Cost DELETE error:", error);
     return NextResponse.json(
-      { error: "Error deleting cost" },
+      { error: "No se pudo eliminar el registro. Reintentá en unos segundos." },
       { status: 500 }
     );
   }

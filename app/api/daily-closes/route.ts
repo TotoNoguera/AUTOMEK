@@ -1,5 +1,8 @@
 import { auth } from "@/lib/auth";
+import { unauthorizedResponse, noTallerResponse, validationErrorResponse } from "@/lib/api";
 import { db } from "@/lib/db";
+import { dayRangeAR, todayAR } from "@/lib/dates";
+import { round2 } from "@/lib/money";
 import { DailyCloseSchema } from "@/lib/validations";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -7,17 +10,14 @@ export async function GET() {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const closes = await db.dailyClose.findMany({
@@ -29,7 +29,7 @@ export async function GET() {
   } catch (error) {
     console.error("DailyCloses GET error:", error);
     return NextResponse.json(
-      { error: "Error fetching daily closes" },
+      { error: "No se pudo cargar la información. Reintentá en unos segundos." },
       { status: 500 }
     );
   }
@@ -39,36 +39,29 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const body = await request.json();
     const validation = DailyCloseSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json(
-        { error: "Invalid data", details: validation.error.errors },
-        { status: 400 }
-      );
+      return validationErrorResponse(validation.error);
     }
 
     const { fecha, notas } = validation.data;
+    // "fecha" es el día del calendario argentino; el rango de movimientos es ese día en hora argentina
     const fechaDate = new Date(`${fecha}T00:00:00.000Z`);
 
-    const today = new Date();
-    today.setUTCHours(23, 59, 59, 999);
-    if (fechaDate > today) {
+    if (fecha > todayAR()) {
       return NextResponse.json(
-        { error: "No se puede cerrar una fecha futura" },
+        { error: "No se puede cerrar una fecha futura." },
         { status: 400 }
       );
     }
@@ -78,7 +71,18 @@ export async function POST(request: NextRequest) {
     });
     if (existing) {
       return NextResponse.json(
-        { error: "La caja de este día ya fue cerrada" },
+        { error: "La caja de este día ya fue cerrada." },
+        { status: 409 }
+      );
+    }
+
+    const laterClose = await db.dailyClose.findFirst({
+      where: { tallerId: userTaller.tallerId, fecha: { gt: fechaDate } },
+      select: { id: true },
+    });
+    if (laterClose) {
+      return NextResponse.json(
+        { error: "Ya existe un cierre de un día posterior. Los cierres deben hacerse en orden cronológico." },
         { status: 409 }
       );
     }
@@ -89,19 +93,18 @@ export async function POST(request: NextRequest) {
     });
     const saldoInicial = previousClose?.saldoFinal ?? 0;
 
-    const start = new Date(`${fecha}T00:00:00.000Z`);
-    const end = new Date(`${fecha}T23:59:59.999Z`);
+    const { start, end } = dayRangeAR(fecha);
 
     const movements = await db.cashMovement.findMany({
-      where: { tallerId: userTaller.tallerId, fecha: { gte: start, lte: end } },
+      where: { tallerId: userTaller.tallerId, fecha: { gte: start, lt: end } },
     });
-    const totalIngresos = movements
-      .filter((m) => m.tipo === "INGRESO")
-      .reduce((sum, m) => sum + m.monto, 0);
-    const totalEgresos = movements
-      .filter((m) => m.tipo === "EGRESO")
-      .reduce((sum, m) => sum + m.monto, 0);
-    const saldoFinal = saldoInicial + totalIngresos - totalEgresos;
+    const totalIngresos = round2(
+      movements.filter((m) => m.tipo === "INGRESO").reduce((sum, m) => sum + m.monto, 0)
+    );
+    const totalEgresos = round2(
+      movements.filter((m) => m.tipo === "EGRESO").reduce((sum, m) => sum + m.monto, 0)
+    );
+    const saldoFinal = round2(saldoInicial + totalIngresos - totalEgresos);
 
     try {
       const dailyClose = await db.$transaction(async (tx) => {
@@ -151,7 +154,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("DailyCloses POST error:", error);
     return NextResponse.json(
-      { error: "Error closing daily cash" },
+      { error: "No se pudo cerrar la caja. Reintentá en unos segundos." },
       { status: 500 }
     );
   }

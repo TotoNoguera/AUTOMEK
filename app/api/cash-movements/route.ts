@@ -1,22 +1,21 @@
 import { auth } from "@/lib/auth";
+import { unauthorizedResponse, noTallerResponse } from "@/lib/api";
 import { db } from "@/lib/db";
+import { dayRangeAR, isValidDateString } from "@/lib/dates";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const { searchParams } = new URL(request.url);
@@ -25,11 +24,26 @@ export async function GET(request: NextRequest) {
     const from = searchParams.get("from");
     const to = searchParams.get("to");
 
-    let fechaFilter: { gte?: Date; lte?: Date } | undefined;
+    const tipos = ["INGRESO", "EGRESO"];
+    const categorias = [
+      "PAGO_ORDEN", "ANTICIPO", "COMPRA_REPUESTOS", "COMPRA_MATERIALES", "GASTO_SERVICIOS", "GASTO_MANTENIMIENTO",
+      "GASTO_SUELDOS", "GASTO_ALQUILER", "GASTO_SERVICIOS_UTILES", "GASTO_IMPUESTOS", "GASTO_OTROS",
+      "COSTO_FIJO_DIARIO", "COSTO_VARIABLE_DIARIO",
+    ];
+    if (
+      (tipo && !tipos.includes(tipo)) ||
+      (categoria && !categorias.includes(categoria)) ||
+      (from && !isValidDateString(from)) ||
+      (to && !isValidDateString(to))
+    ) {
+      return NextResponse.json({ error: "Los filtros indicados no son válidos." }, { status: 400 });
+    }
+
+    let fechaFilter: { gte?: Date; lt?: Date } | undefined;
     if (from && to) {
       fechaFilter = {
-        gte: new Date(`${from}T00:00:00.000Z`),
-        lte: new Date(`${to}T23:59:59.999Z`),
+        gte: dayRangeAR(from).start,
+        lt: dayRangeAR(to).end,
       };
     }
 
@@ -67,7 +81,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("CashMovements GET error:", error);
     return NextResponse.json(
-      { error: "Error fetching cash movements" },
+      { error: "No se pudo cargar la información. Reintentá en unos segundos." },
       { status: 500 }
     );
   }

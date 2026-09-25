@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { unauthorizedResponse, noTallerResponse, validationErrorResponse } from "@/lib/api";
 import { db } from "@/lib/db";
 import { TechnicianSchema } from "@/lib/validations";
 import { NextRequest, NextResponse } from "next/server";
@@ -7,17 +8,14 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const { searchParams } = new URL(request.url);
@@ -35,7 +33,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Technicians GET error:", error);
     return NextResponse.json(
-      { error: "Error fetching technicians" },
+      { error: "No se pudo cargar la información. Reintentá en unos segundos." },
       { status: 500 }
     );
   }
@@ -45,26 +43,20 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const userTaller = await db.userTaller.findFirst({
       where: { userId: session.user.id },
     });
     if (!userTaller) {
-      return NextResponse.json(
-        { error: "User not associated with a taller" },
-        { status: 400 }
-      );
+      return noTallerResponse();
     }
 
     const body = await request.json();
     const validation = TechnicianSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json(
-        { error: "Invalid data", details: validation.error.errors },
-        { status: 400 }
-      );
+      return validationErrorResponse(validation.error);
     }
 
     const technician = await db.technician.create({
@@ -81,7 +73,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Technicians POST error:", error);
     return NextResponse.json(
-      { error: "Error creating technician" },
+      { error: "No se pudo crear el registro. Reintentá en unos segundos." },
       { status: 500 }
     );
   }
