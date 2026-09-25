@@ -43,3 +43,8 @@ export class BusinessError extends Error {
     super(message);
   }
 }
+
+/** Bloquea un movimiento de caja: dos anulaciones simultáneas del mismo movimiento se ejecutan de a una. */
+export async function lockCashMovement(tx: Tx, id: string) {
+  await tx.$queryRaw(Prisma.sql`SELECT "id" FROM ${tableRef("cash_movements")} WHERE "id" = ${id} FOR UPDATE`);
+}

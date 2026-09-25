@@ -23,6 +23,7 @@ model User {
   updatedAt DateTime   @updatedAt
 
   userTallers UserTaller[]
+  auditLogs   AuditLog[]
 
   @@map("users")
 }
@@ -349,6 +350,9 @@ model Payment {
   numeroComprobante String?
   observaciones String?
 
+  anuladoAt     DateTime?
+  anuladoMotivo String?
+
   fecha     DateTime   @default(now())
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
@@ -386,6 +390,9 @@ enum CashMovementCategory {
   // Costos operacionales diarios
   COSTO_FIJO_DIARIO
   COSTO_VARIABLE_DIARIO
+
+  // Contrapartida contable de una anulación (monto negativo, referencia al movimiento original)
+  REVERSION
 }
 
 model CashMovement {
@@ -405,6 +412,15 @@ model CashMovement {
 
   // Relación opcional a payment (si es registrado como pago)
   paymentId String?
+
+  // Cliente cuya cuenta corriente afecta (pago de deuda)
+  clientId  String?
+
+  // Anulación: este movimiento compensa a otro (monto negativo). Un movimiento solo puede anularse una vez.
+  reversalOfId String?       @unique
+  reversalOf   CashMovement? @relation("CashMovementReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversedBy   CashMovement? @relation("CashMovementReversal")
+  motivo       String?
 
   fecha     DateTime   @default(now())
   createdAt DateTime   @default(now())
@@ -605,6 +621,10 @@ model AuditLog {
   tallerId  String
   taller    Taller     @relation(fields: [tallerId], references: [id], onDelete: Cascade)
 
+  // Usuario autenticado que ejecutó la acción (siempre derivado de la sesión del servidor). Null en registros históricos.
+  userId    String?
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
   accion    AuditAction
   entityType String     // QUOTE, WORK_ORDER, PAYMENT, CASH_MOVEMENT, etc.
   entityId  String
@@ -620,6 +640,7 @@ model AuditLog {
   @@index([tallerId])
   @@index([timestamp])
   @@index([entityType])
+  @@index([userId])
   @@map("audit_logs")
 }
 
@@ -629,3 +650,13 @@ model AuditLog {
 
 // Ya hay índices automáticos en @id y @unique
 // Los índices específicos están agregados en cada modelo
+
+// Sesiones (JWT) cerradas con logout: se consulta por jti para que un token ya emitido no pueda reutilizarse.
+model RevokedSession {
+  jti       String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@map("revoked_sessions")
+}

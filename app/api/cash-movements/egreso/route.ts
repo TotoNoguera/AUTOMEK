@@ -44,7 +44,8 @@ export async function POST(request: NextRequest) {
         });
         await tx.auditLog.create({
           data: {
-            tallerId: userTaller.tallerId,
+            userId: session.user.id,
+tallerId: userTaller.tallerId,
             accion: "CASH_MOVEMENT_RECORDED",
             entityType: "CASH_MOVEMENT",
             entityId: created.id,

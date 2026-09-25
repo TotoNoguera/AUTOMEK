@@ -111,7 +111,8 @@ export async function POST(request: NextRequest) {
 
           await tx.auditLog.create({
             data: {
-              tallerId,
+              userId: session.user.id,
+tallerId,
               accion: "PAYMENT_RECORDED",
               entityType: "PAYMENT",
               entityId: payment.id,
@@ -120,7 +121,8 @@ export async function POST(request: NextRequest) {
           });
           await tx.auditLog.create({
             data: {
-              tallerId,
+              userId: session.user.id,
+tallerId,
               accion: "CLIENT_CREDIT_UPDATED",
               entityType: "CLIENT_CREDIT",
               entityId: credit.id,
@@ -147,7 +149,8 @@ export async function POST(request: NextRequest) {
 
         await tx.auditLog.create({
           data: {
-            tallerId,
+            userId: session.user.id,
+tallerId,
             accion: "CASH_MOVEMENT_RECORDED",
             entityType: "CASH_MOVEMENT",
             entityId: movement.id,
@@ -157,7 +160,8 @@ export async function POST(request: NextRequest) {
         if (payment) {
           await tx.auditLog.create({
             data: {
-              tallerId,
+              userId: session.user.id,
+tallerId,
               accion: "PAYMENT_RECORDED",
               entityType: "PAYMENT",
               entityId: payment.id,

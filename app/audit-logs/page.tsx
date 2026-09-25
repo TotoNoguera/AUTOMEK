@@ -15,6 +15,7 @@ import { formatDateTimeAR, todayAR } from "@/lib/dates";
 interface AuditLog {
   id: string;
   accion: string;
+  user?: { name: string; email: string } | null;
   entityType: string;
   entityId: string;
   oldValue?: string;
@@ -71,9 +72,10 @@ export default function AuditLogsPage() {
   function exportCsv() {
     downloadCsv(
       `auditoria-${todayAR()}.csv`,
-      ["Fecha", "Acción", "Entidad", "ID Entidad", "Descripción"],
+      ["Fecha", "Usuario", "Acción", "Entidad", "ID Entidad", "Descripción"],
       logs.map((log) => [
         formatDateTimeAR(log.timestamp),
+        log.user?.name || "",
         ACCION_LABELS[log.accion] || log.accion,
         log.entityType,
         log.entityId,
@@ -116,6 +118,7 @@ export default function AuditLogsPage() {
           <Thead>
             <tr>
               <Th>Fecha</Th>
+              <Th>Usuario</Th>
               <Th>Acción</Th>
               <Th>Entidad</Th>
               <Th>Descripción</Th>
@@ -125,6 +128,7 @@ export default function AuditLogsPage() {
             {logs.map((log) => (
               <Tr key={log.id}>
                 <Td className="whitespace-nowrap text-carbon-400">{formatDateTimeAR(log.timestamp)}</Td>
+                <Td className="text-carbon-300">{log.user?.name || "—"}</Td>
                 <Td className="font-medium">{ACCION_LABELS[log.accion] || log.accion}</Td>
                 <Td className="text-carbon-400">{log.entityType}</Td>
                 <Td className="text-carbon-400">{log.descripcion || log.newValue || "-"}</Td>

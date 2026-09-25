@@ -73,6 +73,7 @@ export async function GET(request: NextRequest) {
       },
       include: {
         workOrder: { include: { client: true, vehicle: true } },
+        reversedBy: { select: { id: true } },
       },
       orderBy: { fecha: "desc" },
     });

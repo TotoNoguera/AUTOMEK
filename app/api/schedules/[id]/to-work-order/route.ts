@@ -87,7 +87,8 @@ export async function POST(
         data: { workOrderId: created.id },
       });
       await logAudit(tx, {
-        tallerId: userTaller.tallerId,
+        userId: session.user.id,
+tallerId: userTaller.tallerId,
         accion: "WORK_ORDER_CREATED",
         entityType: "WORK_ORDER",
         entityId: created.id,
@@ -95,7 +96,8 @@ export async function POST(
         newValue: { total, scheduleId: id },
       });
       await logAudit(tx, {
-        tallerId: userTaller.tallerId,
+        userId: session.user.id,
+tallerId: userTaller.tallerId,
         accion: "SCHEDULE_STATUS_CHANGED",
         entityType: "SCHEDULE",
         entityId: id,

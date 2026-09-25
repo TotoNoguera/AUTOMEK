@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
             }
           : {}),
       },
+      include: { user: { select: { name: true, email: true } } },
       orderBy: { timestamp: "desc" },
       take: 200,
     });

@@ -5,6 +5,8 @@ type Client = Prisma.TransactionClient | typeof db;
 
 interface AuditEntry {
   tallerId: string;
+  /** Usuario autenticado que ejecuta la acción. Siempre proviene de la sesión del servidor, nunca del cliente. */
+  userId: string;
   accion: AuditAction;
   entityType: string;
   entityId: string;
@@ -18,6 +20,7 @@ export function logAudit(client: Client, entry: AuditEntry) {
   return client.auditLog.create({
     data: {
       tallerId: entry.tallerId,
+      userId: entry.userId,
       accion: entry.accion,
       entityType: entry.entityType,
       entityId: entry.entityId,

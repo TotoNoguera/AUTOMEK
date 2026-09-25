@@ -32,6 +32,7 @@ interface Payment {
   status: string;
   fecha?: string;
   method?: { nombre: string };
+  anuladoMotivo?: string | null;
 }
 
 interface WorkOrder {
@@ -150,6 +151,27 @@ export default function WorkOrderDetailPage() {
       }
     } catch (error) {
       showToast("Error actualizando orden de trabajo", "error");
+    }
+  }
+
+  async function annulPayment(paymentId: string) {
+    const motivo = window.prompt("Motivo de la anulación (obligatorio). El pago no se borra: queda registrado como anulado.");
+    if (motivo === null) return;
+    try {
+      const response = await fetch(`/api/payments/${paymentId}/annul`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ motivo }),
+      });
+      if (response.ok) {
+        showToast("Pago anulado correctamente", "success");
+        loadWorkOrder();
+      } else {
+        const error = await response.json();
+        showToast(error.error, "error");
+      }
+    } catch {
+      showToast("No se pudo anular el pago. Revisá tu conexión e intentá de nuevo.", "error");
     }
   }
 
@@ -419,7 +441,8 @@ export default function WorkOrderDetailPage() {
             <CardContent>
               <h3 className="mb-3 font-semibold text-white">Pagos</h3>
               {(() => {
-                const pagos = (workOrder.payments || []).filter((p) => p.status === "PAGADO");
+                const todosLosPagos = workOrder.payments || [];
+                const pagos = todosLosPagos.filter((p) => p.status === "PAGADO");
                 const pagado = pagos.reduce((sum, p) => sum + p.monto, 0);
                 const pendiente = pendingAmount(workOrder.total, workOrder.payments || []);
                 return (
@@ -440,16 +463,24 @@ export default function WorkOrderDetailPage() {
                         </p>
                       </div>
                     </div>
-                    {pagos.length === 0 ? (
+                    {todosLosPagos.length === 0 ? (
                       <p className="text-sm text-carbon-400">Todavía no hay pagos registrados. Los cobros se cargan desde Caja.</p>
                     ) : (
                       <ul className="divide-y divide-carbon-700 text-sm">
-                        {pagos.map((p, i) => (
-                          <li key={p.id ?? i} className="flex items-center justify-between py-2">
-                            <span className="text-carbon-300">
+                        {todosLosPagos.map((p, i) => (
+                          <li key={p.id ?? i} className="flex items-center justify-between gap-3 py-2">
+                            <span className={p.status === "PAGADO" ? "text-carbon-300" : "text-carbon-500 line-through"}>
                               {p.fecha ? formatDateAR(p.fecha) : ""} {p.method ? `· ${p.method.nombre}` : ""}
+                              {p.status === "ANULADO" && p.anuladoMotivo ? ` — anulado: ${p.anuladoMotivo}` : ""}
                             </span>
-                            <span className="font-medium text-carbon-100">{formatCurrency(p.monto)}</span>
+                            <span className="flex items-center gap-3">
+                              <span className={p.status === "PAGADO" ? "font-medium text-carbon-100" : "text-carbon-500 line-through"}>{formatCurrency(p.monto)}</span>
+                              {p.status === "PAGADO" && p.id && (
+                                <button onClick={() => annulPayment(p.id!)} className="text-xs font-medium text-red-400 hover:text-red-300">
+                                  Anular
+                                </button>
+                              )}
+                            </span>
                           </li>
                         ))}
                       </ul>

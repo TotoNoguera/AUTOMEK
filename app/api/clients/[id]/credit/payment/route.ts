@@ -67,13 +67,15 @@ export async function POST(
           tipo: "INGRESO",
           categoria: "ANTICIPO",
           monto,
+          clientId: id,
           descripcion: observaciones || `Pago cuenta corriente - ${client.nombre}`,
         },
       });
 
       await tx.auditLog.create({
         data: {
-          tallerId: userTaller.tallerId,
+          userId: session.user.id,
+tallerId: userTaller.tallerId,
           accion: "CLIENT_CREDIT_UPDATED",
           entityType: "CLIENT_CREDIT",
           entityId: updatedCredit.id,
@@ -84,7 +86,8 @@ export async function POST(
       });
       await tx.auditLog.create({
         data: {
-          tallerId: userTaller.tallerId,
+          userId: session.user.id,
+tallerId: userTaller.tallerId,
           accion: "CASH_MOVEMENT_RECORDED",
           entityType: "CASH_MOVEMENT",
           entityId: cashMovement.id,

@@ -75,7 +75,8 @@ export async function PUT(
         include: { client: true, vehicle: true, items: true },
       });
       await logAudit(tx, {
-        tallerId: userTaller.tallerId,
+        userId: session.user.id,
+tallerId: userTaller.tallerId,
         accion:
           newStatus === "ENTREGADA"
             ? "WORK_ORDER_DELIVERED"

@@ -41,6 +41,9 @@ interface CashMovement {
   descripcion?: string;
   fecha: string;
   workOrder?: { id: string; client: { nombre: string }; vehicle: { patente: string } } | null;
+  reversalOfId?: string | null;
+  reversedBy?: { id: string } | null;
+  motivo?: string | null;
 }
 
 const CATEGORIA_LABELS: Record<string, string> = {
@@ -55,6 +58,7 @@ const CATEGORIA_LABELS: Record<string, string> = {
   GASTO_SERVICIOS_UTILES: "Servicios (luz, agua, etc.)",
   GASTO_IMPUESTOS: "Impuestos",
   GASTO_OTROS: "Otros Gastos",
+  REVERSION: "Anulación",
 };
 
 const EGRESO_CATEGORIAS = [
@@ -153,6 +157,37 @@ export default function CashMovementsPage() {
     }
     loadInitial();
   }, []);
+
+  const [reverseTarget, setReverseTarget] = useState<CashMovement | null>(null);
+  const [reverseMotivo, setReverseMotivo] = useState("");
+
+  function openReverse(m: CashMovement) {
+    setReverseMotivo("");
+    setReverseTarget(m);
+  }
+
+  async function handleReverse(e: React.FormEvent) {
+    e.preventDefault();
+    if (!reverseTarget) return;
+    try {
+      const response = await fetch(`/api/cash-movements/${reverseTarget.id}/reverse`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ motivo: reverseMotivo }),
+      });
+      if (response.ok) {
+        showToast("Movimiento anulado. Quedó registrada la anulación en Caja.", "success");
+        setReverseTarget(null);
+        loadMovements();
+        loadTodaySummary();
+      } else {
+        const error = await response.json();
+        showToast(error.error, "error");
+      }
+    } catch {
+      showToast("No se pudo anular el movimiento. Revisá tu conexión e intentá de nuevo.", "error");
+    }
+  }
 
   function pendienteDe(wo: WorkOrderOption) {
     const pagado = wo.payments
@@ -267,6 +302,28 @@ export default function CashMovementsPage() {
         </div>
       )}
 
+      <Modal open={reverseTarget !== null} onClose={() => setReverseTarget(null)} title="Anular movimiento">
+        <form onSubmit={guard(handleReverse)} className="space-y-4">
+          <p className="text-sm text-carbon-300">
+            Se va a anular {reverseTarget ? `el movimiento de ${formatCurrency(reverseTarget.monto)}` : ""}. No se borra: queda registrado con su contraasiento y el motivo.
+          </p>
+          <Input
+            type="text"
+            placeholder="Motivo de la anulación *"
+            value={reverseMotivo}
+            onChange={(e) => setReverseMotivo(e.target.value)}
+            maxLength={200}
+            required
+          />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setReverseTarget(null)}>
+              Cancelar
+            </Button>
+            <Button type="submit" loading={submitting} variant="danger">Anular movimiento</Button>
+          </div>
+        </form>
+      </Modal>
+
       <Modal open={showIngreso} onClose={() => setShowIngreso(false)} title="Registrar Ingreso">
         <form onSubmit={guard(handleIngresoSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -354,6 +411,7 @@ export default function CashMovementsPage() {
               <Th>Orden</Th>
               <Th>Descripción</Th>
               <Th>Monto</Th>
+              <Th>Acciones</Th>
             </tr>
           </Thead>
           <Tbody>
@@ -366,8 +424,28 @@ export default function CashMovementsPage() {
                 <Td className="text-carbon-400">{CATEGORIA_LABELS[m.categoria] || m.categoria}</Td>
                 <Td className="text-carbon-400">{m.workOrder ? `${m.workOrder.client.nombre} - ${m.workOrder.vehicle.patente}` : "-"}</Td>
                 <Td className="text-carbon-400">{m.descripcion || "-"}</Td>
-                <Td className={`font-semibold ${m.tipo === "INGRESO" ? "text-emerald-400" : "text-red-400"}`}>
-                  {m.tipo === "INGRESO" ? "+" : "-"}{formatCurrency(m.monto)}
+                {(() => {
+                  // Efecto real sobre la caja: ingreso suma, egreso resta; una anulación tiene el signo contrario al original
+                  const efecto = m.tipo === "EGRESO" ? -m.monto : m.monto;
+                  return (
+                    <Td className={`font-semibold ${efecto >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {efecto > 0 ? "+" : ""}{formatCurrency(efecto)}
+                    </Td>
+                  );
+                })()}
+                <Td>
+                  {m.reversedBy ? (
+                    <Badge variant="neutral">Anulado</Badge>
+                  ) : m.categoria === "REVERSION" ? (
+                    <span className="text-xs text-carbon-400">{m.motivo || "Anulación"}</span>
+                  ) : (
+                    <button
+                      onClick={() => openReverse(m)}
+                      className="text-xs font-medium text-red-400 hover:text-red-300"
+                    >
+                      Anular
+                    </button>
+                  )}
                 </Td>
               </Tr>
             ))}

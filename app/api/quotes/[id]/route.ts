@@ -169,7 +169,8 @@ export async function PATCH(
       });
       if (existing.status !== validation.data.status && validation.data.status !== "PENDIENTE") {
         await logAudit(tx, {
-          tallerId: userTaller.tallerId,
+          userId: session.user.id,
+tallerId: userTaller.tallerId,
           accion: validation.data.status === "APROBADO" ? "QUOTE_APPROVED" : "QUOTE_REJECTED",
           entityType: "QUOTE",
           entityId: id,

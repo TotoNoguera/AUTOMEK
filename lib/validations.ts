@@ -288,3 +288,8 @@ export const CostSchema = z.object({
   anio: z.number({ invalid_type_error: "El año debe ser un número" }).int("El año debe ser un número entero").min(2000, "Año inválido").max(2100, "Año inválido"),
   workOrderId: z.string().cuid().optional(),
 });
+
+// Anulación de pagos/movimientos: el motivo es obligatorio para dejar trazabilidad
+export const ReversalSchema = z.object({
+  motivo: requiredText("Motivo", 3, 200),
+});

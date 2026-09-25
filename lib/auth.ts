@@ -64,14 +64,37 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
   pages: {
     signIn: "/auth/login",
   },
+  events: {
+    // Al cerrar sesión, el identificador (jti) del token queda revocado hasta su vencimiento
+    async signOut(message) {
+      const token = "token" in message ? message.token : null;
+      const jti = token?.jti as string | undefined;
+      if (!jti) return;
+      try {
+        const expiresAt = new Date(((token?.exp as number | undefined) ?? Math.floor(Date.now() / 1000) + 30 * 24 * 3600) * 1000);
+        await db.revokedSession.upsert({ where: { jti }, update: {}, create: { jti, expiresAt } });
+        await db.revokedSession.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+      } catch (error) {
+        console.error("No se pudo revocar la sesión:", error);
+      }
+    },
+  },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.jti = crypto.randomUUID();
       }
       return token;
     },
     async session({ session, token }) {
+      // Sesión revocada por logout: se devuelve sin usuario, de modo que las rutas responden 401
+      if (token.jti) {
+        const revoked = await db.revokedSession.findUnique({ where: { jti: token.jti as string }, select: { jti: true } });
+        if (revoked) {
+          return { ...session, user: undefined } as unknown as typeof session;
+        }
+      }
       if (session.user) {
         session.user.id = token.id as string;
       }

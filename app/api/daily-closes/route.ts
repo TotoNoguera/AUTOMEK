@@ -124,7 +124,8 @@ export async function POST(request: NextRequest) {
 
         await tx.auditLog.create({
           data: {
-            tallerId: userTaller.tallerId,
+            userId: session.user.id,
+tallerId: userTaller.tallerId,
             accion: "DAILY_CLOSE_CLOSED",
             entityType: "DAILY_CLOSE",
             entityId: created.id,

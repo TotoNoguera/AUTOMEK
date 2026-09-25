@@ -177,7 +177,8 @@ export async function POST(request: NextRequest) {
       include: { client: true, vehicle: true, items: true },
     });
       await logAudit(tx, {
-        tallerId: userTaller.tallerId,
+        userId: session.user.id,
+tallerId: userTaller.tallerId,
         accion: "WORK_ORDER_CREATED",
         entityType: "WORK_ORDER",
         entityId: created.id,
@@ -186,7 +187,8 @@ export async function POST(request: NextRequest) {
       });
       if (quoteId) {
         await logAudit(tx, {
-          tallerId: userTaller.tallerId,
+          userId: session.user.id,
+tallerId: userTaller.tallerId,
           accion: "QUOTE_CONVERTED_TO_WORK_ORDER",
           entityType: "QUOTE",
           entityId: quoteId,

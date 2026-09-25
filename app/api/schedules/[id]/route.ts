@@ -125,7 +125,8 @@ export async function PUT(
       });
       if (status && status !== existing.status) {
         await logAudit(tx, {
-          tallerId: userTaller.tallerId,
+          userId: session.user.id,
+tallerId: userTaller.tallerId,
           accion: "SCHEDULE_STATUS_CHANGED",
           entityType: "SCHEDULE",
           entityId: id,
