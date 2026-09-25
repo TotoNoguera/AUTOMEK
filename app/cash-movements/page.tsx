@@ -101,7 +101,11 @@ export default function CashMovementsPage() {
       const [movsRes, closesRes] = await Promise.all([fetch(url), fetch("/api/daily-closes")]);
       const todayMovs: CashMovement[] = movsRes.ok ? await movsRes.json() : [];
       const closes = closesRes.ok ? await closesRes.json() : [];
-      const saldoInicial = closes.length > 0 ? closes[0].saldoFinal : 0;
+      // Saldo inicial de hoy = saldo final del último cierre ANTERIOR a hoy (el cierre de hoy, si existe, ya incluye los movimientos de hoy)
+      const previousClose = (closes as Array<{ fecha: string; saldoFinal: number }>)
+        .filter((c) => c.fecha.slice(0, 10) < today)
+        .sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
+      const saldoInicial = previousClose ? previousClose.saldoFinal : 0;
       const ingresos = todayMovs.filter((m) => m.tipo === "INGRESO").reduce((s, m) => s + m.monto, 0);
       const egresos = todayMovs.filter((m) => m.tipo === "EGRESO").reduce((s, m) => s + m.monto, 0);
       setTodaySummary({ saldoInicial, ingresos, egresos });
