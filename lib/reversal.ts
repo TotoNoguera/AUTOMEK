@@ -56,7 +56,7 @@ export async function reverseCashMovement(tx: Tx, movementId: string, actor: Act
       entityId: payment.id,
       descripcion: `Pago de $${fmt(payment.monto)} anulado. Motivo: ${actor.motivo}`,
       oldValue: { status: "PAGADO" },
-      newValue: { status: "ANULADO" },
+      newValue: { status: "ANULADO", monto: payment.monto, motivo: actor.motivo, movimientoOriginalId: original.id },
     });
   }
 
@@ -104,7 +104,7 @@ export async function reverseCashMovement(tx: Tx, movementId: string, actor: Act
     entityType: "CASH_MOVEMENT",
     entityId: reversal.id,
     descripcion: `Anulación del movimiento ${original.id}. Motivo: ${actor.motivo}`,
-    newValue: { tipo: original.tipo, monto: reversal.monto, categoria: "REVERSION", reversalOfId: original.id },
+    newValue: { tipo: original.tipo, monto: reversal.monto, categoria: "REVERSION", reversalOfId: original.id, motivo: actor.motivo },
   });
   return reversal;
 }
@@ -136,7 +136,7 @@ export async function annulCreditCharge(tx: Tx, paymentId: string, actor: Actor)
     entityId: paymentId,
     descripcion: `Cargo a cuenta corriente de $${fmt(payment.monto)} anulado. Motivo: ${actor.motivo}`,
     oldValue: { status: "PAGADO" },
-    newValue: { status: "ANULADO" },
+    newValue: { status: "ANULADO", monto: payment.monto, motivo: actor.motivo },
   });
   if (credit) {
     const updated = await tx.clientCredit.update({
