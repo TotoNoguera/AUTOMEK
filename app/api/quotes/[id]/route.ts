@@ -26,7 +26,7 @@ export async function GET(
 
     const quote = await db.quote.findUnique({
       where: { id },
-      include: { client: true, vehicle: true, items: true, workOrder: { select: { id: true } } },
+      include: { client: true, vehicle: true, items: true, workOrder: { select: { id: true } }, taller: { select: { nombre: true } } },
     });
 
     if (!quote || quote.tallerId !== userTaller.tallerId) {

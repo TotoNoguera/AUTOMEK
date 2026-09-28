@@ -34,6 +34,7 @@ interface Quote {
   vehicle: { id: string; patente: string; marca: string; modelo: string };
   items: QuoteItem[];
   workOrder?: { id: string } | null;
+  taller: { nombre: string };
 }
 
 interface QuoteItemForm {
@@ -222,6 +223,7 @@ export default function QuoteDetailPage() {
             <CardContent>
               <div className="mb-4 flex items-start justify-between">
                 <div>
+                  <p className="text-2xl font-extrabold tracking-wide text-white">{quote.taller.nombre.toUpperCase()}</p>
                   <h1 className="text-xl font-bold text-white">Presupuesto #{quote.id.slice(-6)}</h1>
                   <p className="text-sm text-carbon-400">{formatDateAR(quote.fecha)}</p>
                 </div>
