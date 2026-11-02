@@ -60,6 +60,7 @@ export const config = {
     "/vehicles/:path*",
     "/quotes/:path*",
     "/work-orders/:path*",
+    "/products/:path*",
     "/schedules/:path*",
     "/cash-movements/:path*",
     "/daily-closes/:path*",
