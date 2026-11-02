@@ -48,3 +48,15 @@ export class BusinessError extends Error {
 export async function lockCashMovement(tx: Tx, id: string) {
   await tx.$queryRaw(Prisma.sql`SELECT "id" FROM ${tableRef("cash_movements")} WHERE "id" = ${id} FOR UPDATE`);
 }
+
+/**
+ * Bloquea los productos indicados hasta el fin de la transacción, SIEMPRE en orden ascendente de id.
+ * Orden de bloqueo uniforme del módulo de stock: primero la orden (lockWorkOrder), después los productos por id.
+ */
+export async function lockProducts(tx: Tx, ids: string[]) {
+  const sorted = [...new Set(ids)].sort();
+  if (sorted.length === 0) return;
+  await tx.$queryRaw(
+    Prisma.sql`SELECT "id" FROM ${tableRef("products")} WHERE "id" IN (${Prisma.join(sorted)}) ORDER BY "id" FOR UPDATE`
+  );
+}

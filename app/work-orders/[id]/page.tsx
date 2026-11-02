@@ -4,7 +4,10 @@ import { useSubmitGuard } from "@/lib/useSubmitGuard";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Printer, Pencil, Trash2, Plus, MessageCircle } from "lucide-react";
+import { ArrowLeft, Printer, Pencil, Trash2, Plus, MessageCircle, Package } from "lucide-react";
+import { ProductLink, type ProductOption } from "@/components/stock/ProductLink";
+import { OrderStockCard } from "@/components/stock/OrderStockCard";
+import { formatQuantity } from "@/lib/units";
 import { useToast } from "@/components/common/ToastProvider";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -20,6 +23,7 @@ import { formatDateAR } from "@/lib/dates";
 
 interface WorkOrderItem {
   id: string;
+  productId?: string | null;
   descripcion: string;
   cantidad: number;
   precioUnitario: number;
@@ -90,6 +94,8 @@ export default function WorkOrderDetailPage() {
   const [newItemDesc, setNewItemDesc] = useState("");
   const [newItemCant, setNewItemCant] = useState("1");
   const [newItemPrecio, setNewItemPrecio] = useState("0");
+  const [newItemProductId, setNewItemProductId] = useState<string | undefined>();
+  const [newItemProduct, setNewItemProduct] = useState<ProductOption | undefined>();
 
   useEffect(() => {
     loadWorkOrder();
@@ -134,6 +140,8 @@ export default function WorkOrderDetailPage() {
           kmIngreso: kmIngreso ? parseInt(kmIngreso) : undefined,
           kmEgreso: kmEgreso ? parseInt(kmEgreso) : undefined,
           items: workOrder.items.map((item) => ({
+            // El producto vinculado viaja con el ítem: al guardar se reemplazan todos los ítems
+            productId: item.productId ?? undefined,
             descripcion: item.descripcion,
             cantidad: item.cantidad,
             precioUnitario: item.precioUnitario,
@@ -201,6 +209,7 @@ export default function WorkOrderDetailPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          productId: newItemProductId,
           descripcion: newItemDesc,
           cantidad: Number(newItemCant) || 1,
           precioUnitario: Number(newItemPrecio) || 0,
@@ -210,6 +219,8 @@ export default function WorkOrderDetailPage() {
         setNewItemDesc("");
         setNewItemCant("1");
         setNewItemPrecio("0");
+        setNewItemProductId(undefined);
+        setNewItemProduct(undefined);
         showToast("Trabajo agregado correctamente", "success");
         loadWorkOrder();
       } else {
@@ -405,8 +416,11 @@ export default function WorkOrderDetailPage() {
               <Tbody>
                 {workOrder.items.map((item) => (
                   <Tr key={item.id}>
-                    <Td>{item.descripcion}</Td>
-                    <Td className="text-carbon-400">{item.cantidad}</Td>
+                    <Td>
+                      {item.descripcion}
+                      {item.productId && <span className="ml-2 inline-flex items-center gap-1 align-middle text-[11px] text-brand-400"><Package className="h-3 w-3" /> Inventario</span>}
+                    </Td>
+                    <Td className="text-carbon-400">{formatQuantity(item.cantidad)}</Td>
                     <Td className="text-carbon-400">{formatCurrency(item.precioUnitario)}</Td>
                     <Td className="font-medium">{formatCurrency(item.subtotal)}</Td>
                     <Td>
@@ -491,6 +505,8 @@ export default function WorkOrderDetailPage() {
             </CardContent>
           </Card>
 
+          <OrderStockCard workOrderId={workOrderId} refreshKey={`${workOrder.status}:${workOrder.items.map((i) => i.id).join(",")}`} />
+
           {workOrder.margen !== undefined && (
             <Card className="no-print mb-8">
               <CardContent className="flex items-center justify-between">
@@ -518,7 +534,8 @@ export default function WorkOrderDetailPage() {
                 <Input
                   type="number"
                   placeholder="Cant."
-                  min="1"
+                  min="0.001"
+                  step="0.001"
                   value={newItemCant}
                   onChange={(e) => setNewItemCant(e.target.value)}
                   className="col-span-4 sm:col-span-2"
@@ -537,6 +554,24 @@ export default function WorkOrderDetailPage() {
                 <Button type="submit" loading={submitting} className="col-span-2 sm:col-span-1 px-0">
                   <Plus className="h-4 w-4" />
                 </Button>
+                <div className="col-span-12">
+                  <ProductLink
+                    productId={newItemProductId}
+                    product={newItemProduct}
+                    cantidad={Number(newItemCant) || 0}
+                    contexto="orden"
+                    onSelect={(p) => {
+                      setNewItemProductId(p.id);
+                      setNewItemProduct(p);
+                      setNewItemDesc(p.nombre);
+                      setNewItemPrecio(String(p.precioVenta));
+                    }}
+                    onClear={() => {
+                      setNewItemProductId(undefined);
+                      setNewItemProduct(undefined);
+                    }}
+                  />
+                </div>
               </form>
             </CardContent>
           </Card>

@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
+import { ProductLink, type ProductOption } from "@/components/stock/ProductLink";
 import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
@@ -21,6 +22,9 @@ interface QuoteItemForm {
   descripcion: string;
   cantidad: string;
   precioUnitario: string;
+  /** Producto del inventario vinculado (opcional) */
+  productId?: string;
+  producto?: ProductOption;
 }
 
 interface Quote {
@@ -111,6 +115,18 @@ export default function QuotesPage() {
     setItems([...items, { descripcion: "", cantidad: "1", precioUnitario: "0" }]);
   }
 
+  function selectProduct(index: number, product: ProductOption) {
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], productId: product.id, producto: product, descripcion: product.nombre, precioUnitario: String(product.precioVenta) };
+    setItems(newItems);
+  }
+
+  function clearProduct(index: number) {
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], productId: undefined, producto: undefined };
+    setItems(newItems);
+  }
+
   function removeItem(index: number) {
     setItems(items.filter((_, i) => i !== index));
   }
@@ -139,6 +155,7 @@ export default function QuotesPage() {
           observaciones: observaciones || undefined,
           items: items.map((item) => ({
             descripcion: item.descripcion,
+            productId: item.productId,
             cantidad: Number(item.cantidad) || 1,
             precioUnitario: Number(item.precioUnitario) || 0,
           })),
@@ -224,7 +241,8 @@ export default function QuotesPage() {
                   <Input
                     type="number"
                     placeholder="Cant."
-                    min="1"
+                    min="0.001"
+                    step="0.001"
                     value={item.cantidad}
                     onChange={(e) => updateItem(index, "cantidad", e.target.value)}
                     className="col-span-2"
@@ -248,6 +266,16 @@ export default function QuotesPage() {
                   >
                     <X className="h-4 w-4" />
                   </button>
+                  <div className="col-span-12">
+                    <ProductLink
+                      productId={item.productId}
+                      product={item.producto}
+                      cantidad={Number(item.cantidad) || 0}
+                      contexto="presupuesto"
+                      onSelect={(p) => selectProduct(index, p)}
+                      onClear={() => clearProduct(index)}
+                    />
+                  </div>
                 </div>
               ))}
             </div>

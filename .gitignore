@@ -19,6 +19,9 @@
 .env
 .env.local
 .env.*.local
+# Entorno de QA (contiene la conexión a la base de QA): nunca se versiona. La plantilla sí.
+.env.qa*
+!.env.qa-stock.example
 
 # Debug
 npm-debug.log*

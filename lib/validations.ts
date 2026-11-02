@@ -34,6 +34,17 @@ const MAX_MONEY = 1_000_000_000;
 const MAX_KM = 2_000_000;
 
 const hasAtMostTwoDecimals = (v: number) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-6;
+const hasAtMostThreeDecimals = (v: number) => Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-6;
+
+// Cantidades y stock: DECIMAL(12,3) en la base (litros, kilos, metros). Hasta 3 decimales.
+const MAX_QUANTITY = 1_000_000;
+const quantity = (label: string, min = 0.001, max = MAX_QUANTITY) =>
+  z
+    .number({ required_error: `${label} es requerida`, invalid_type_error: `${label} debe ser un número` })
+    .finite(`${label} debe ser un número`)
+    .min(min, `${label} debe ser mayor a 0`)
+    .max(max, `${label} es demasiado alta`)
+    .refine(hasAtMostThreeDecimals, `${label} admite hasta 3 decimales`);
 
 const money = (label: string, min = 0) =>
   z
@@ -141,13 +152,10 @@ export const VehicleSchema = z.object({
 // Quote schemas
 export const QuoteItemSchema = z.object({
   descripcion: requiredText("Descripción", 1, 200, "requerida"),
-  cantidad: z
-    .number({ required_error: "Cantidad es requerida", invalid_type_error: "Cantidad debe ser un número" })
-    .finite("Cantidad debe ser un número")
-    .min(0.01, "Cantidad debe ser mayor a 0")
-    .max(100_000, "Cantidad demasiado alta")
-    .refine(hasAtMostTwoDecimals, "Cantidad admite hasta 2 decimales"),
+  cantidad: quantity("Cantidad", 0.001, 100_000),
   precioUnitario: money("Precio"),
+  // Producto del inventario (opcional: los ítems de texto libre y mano de obra no lo llevan)
+  productId: z.string().cuid("Producto inválido").nullish().transform((v) => v ?? undefined),
 });
 
 export const QuoteSchema = z.object({
@@ -291,5 +299,68 @@ export const CostSchema = z.object({
 
 // Anulación de pagos/movimientos: el motivo es obligatorio para dejar trazabilidad
 export const ReversalSchema = z.object({
+  motivo: requiredText("Motivo", 3, 200),
+});
+
+// ============================================================================
+// Stock (productos, compras, ajustes)
+// ============================================================================
+
+export const PRODUCT_UNITS = ["UNIDAD", "LITRO", "KILO", "METRO", "JUEGO", "PAR"] as const;
+
+export const SkuSchema = z
+  .string({ invalid_type_error: "El código (SKU) debe ser un texto" })
+  .trim()
+  .max(40, "El código (SKU) no puede superar los 40 caracteres")
+  .transform((v) => v.toUpperCase())
+  .refine((v) => v === "" || /^[A-Z0-9][A-Z0-9._/-]*$/.test(v), "El código (SKU) solo admite letras, números, punto, guion y barra")
+  .optional()
+  .transform((v) => (v ? v : undefined));
+
+export const ProductSchema = z
+  .object({
+    nombre: requiredText("Nombre", 2, 120),
+    sku: SkuSchema,
+    categoria: optionalText("Categoría", 60),
+    unidad: z.enum(PRODUCT_UNITS, { errorMap: () => ({ message: "Unidad inválida" }) }).default("UNIDAD"),
+    costo: money("Costo").default(0),
+    precioVenta: money("Precio de venta").default(0),
+    stockMinimo: quantity("Stock mínimo", 0).default(0),
+    activo: z.boolean({ invalid_type_error: "Estado inválido" }).optional(),
+    // Solo al crear: se registra como una entrada de stock (nunca se escribe stockActual directamente)
+    stockInicial: quantity("Stock inicial").optional(),
+  })
+  .strict();
+
+export const ProductUpdateSchema = ProductSchema.omit({ stockInicial: true });
+
+export const PurchaseSchema = z.object({
+  productId: z.string({ required_error: "Producto es requerido" }).cuid("Producto inválido"),
+  cantidad: quantity("Cantidad"),
+  costoUnitario: money("Costo unitario").optional(),
+  motivo: optionalText("Motivo", 200),
+});
+
+export const StockAdjustSchema = z.object({
+  productId: z.string({ required_error: "Producto es requerido" }).cuid("Producto inválido"),
+  // Con signo: positivo suma, negativo resta. No puede ser 0.
+  cantidad: z
+    .number({ required_error: "Cantidad es requerida", invalid_type_error: "Cantidad debe ser un número" })
+    .finite("Cantidad debe ser un número")
+    .refine((v) => v !== 0, "La cantidad del ajuste no puede ser 0")
+    .refine((v) => Math.abs(v) <= MAX_QUANTITY, "Cantidad demasiado alta")
+    .refine(hasAtMostThreeDecimals, "Cantidad admite hasta 3 decimales"),
+  motivo: requiredText("Motivo", 3, 200),
+});
+
+export const StockSettingsSchema = z.object({
+  permitirStockNegativo: z.boolean({ required_error: "Indicá si se permite stock negativo", invalid_type_error: "Valor inválido" }),
+});
+
+export const StockReturnSchema = z.object({
+  workOrderId: z.string({ required_error: "Orden de trabajo es requerida" }).cuid("Orden de trabajo inválida"),
+  productId: z.string({ required_error: "Producto es requerido" }).cuid("Producto inválido"),
+  // Unidades físicamente recuperadas
+  cantidad: quantity("Cantidad"),
   motivo: requiredText("Motivo", 3, 200),
 });

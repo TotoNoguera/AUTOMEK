@@ -16,6 +16,7 @@ export async function middleware(request: NextRequest) {
     "/vehicles",
     "/quotes",
     "/work-orders",
+    "/products",
     "/schedules",
     "/cash-movements",
     "/daily-closes",

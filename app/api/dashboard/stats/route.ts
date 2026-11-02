@@ -64,6 +64,15 @@ export async function GET() {
     const deudaCuentaCorriente = negativeCredits.reduce((sum, c) => sum + -c.saldo, 0);
     const deudasPendientes = round2(deudaOrdenes + deudaCuentaCorriente);
 
+    // Stock bajo: productos activos con stockActual <= stockMinimo (los más críticos primero)
+    const productosActivos = await db.product.findMany({
+      where: { tallerId, activo: true },
+      select: { id: true, nombre: true, unidad: true, stockActual: true, stockMinimo: true },
+    });
+    const productosStockBajo = productosActivos
+      .filter((p) => p.stockActual.lte(p.stockMinimo))
+      .sort((a, b) => a.stockActual.minus(a.stockMinimo).comparedTo(b.stockActual.minus(b.stockMinimo)) || a.nombre.localeCompare(b.nombre));
+
     const vehicleCounts = new Map<
       string,
       { patente: string; marca: string; modelo: string; count: number }
@@ -127,6 +136,7 @@ export async function GET() {
         vehiculosFrecuentes,
         objetivosMes: goalsMes,
         monthlyData,
+        stockBajo: { total: productosStockBajo.length, productos: productosStockBajo.slice(0, 5) },
       },
       { status: 200 }
     );

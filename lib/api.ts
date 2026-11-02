@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { BusinessError } from "@/lib/cash";
 import type { ZodError } from "zod";
 
 // Mensajes visibles para el usuario final. Los detalles técnicos van solo a console.error.
@@ -45,4 +46,20 @@ export function prismaCode(error: unknown): string | undefined {
     return typeof code === "string" ? code : undefined;
   }
   return undefined;
+}
+
+/**
+ * Traduce los errores controlados de un servicio a una respuesta HTTP: BusinessError (con su estado) y los
+ * cierres de transacción por contención (P2028/P2034 -> 409). Devuelve null si el error no es de esos tipos.
+ */
+export function serviceErrorResponse(error: unknown): NextResponse | null {
+  if (error instanceof BusinessError) return NextResponse.json({ error: error.message }, { status: error.status });
+  const code = prismaCode(error);
+  if (code === "P2028" || code === "P2034") {
+    return NextResponse.json(
+      { error: "Hay otra operación en curso sobre estos datos. Esperá unos segundos y reintentá." },
+      { status: 409 }
+    );
+  }
+  return null;
 }

@@ -13,6 +13,7 @@ import {
   Receipt,
   ShieldCheck,
   BarChart3,
+  Package,
   type LucideIcon,
 } from "lucide-react";
 
@@ -37,6 +38,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Vehículos", href: "/vehicles", icon: Car },
       { label: "Presupuestos", href: "/quotes", icon: FileText },
       { label: "Órdenes", href: "/work-orders", icon: Wrench },
+      { label: "Productos", href: "/products", icon: Package },
       { label: "Agenda", href: "/schedules", icon: CalendarDays },
       { label: "Caja", href: "/cash-movements", icon: Wallet },
       { label: "Cierre de Caja", href: "/daily-closes", icon: Lock },

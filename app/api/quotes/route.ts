@@ -1,9 +1,10 @@
 import { auth } from "@/lib/auth";
-import { unauthorizedResponse, noTallerResponse, validationErrorResponse } from "@/lib/api";
+import { unauthorizedResponse, noTallerResponse, validationErrorResponse, serviceErrorResponse } from "@/lib/api";
 import { db } from "@/lib/db";
 import { normalizeText } from "@/lib/text";
 import { logAudit } from "@/lib/audit";
 import { round2 } from "@/lib/money";
+import { assertProductsUsable } from "@/lib/stock";
 import { QuoteSchema } from "@/lib/validations";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -95,7 +96,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    await assertProductsUsable(db, userTaller.tallerId, items.map((i) => i.productId));
     const itemsWithSubtotal = items.map((item) => ({
+      productId: item.productId,
       descripcion: item.descripcion,
       cantidad: item.cantidad,
       precioUnitario: item.precioUnitario,
@@ -128,6 +131,8 @@ tallerId: userTaller.tallerId,
 
     return NextResponse.json(quote, { status: 201 });
   } catch (error) {
+    const handled = serviceErrorResponse(error);
+    if (handled) return handled;
     console.error("Quotes POST error:", error);
     return NextResponse.json(
       { error: "No se pudo crear el registro. Reintentá en unos segundos." },

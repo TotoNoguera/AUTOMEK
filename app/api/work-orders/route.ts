@@ -1,10 +1,11 @@
 import { auth } from "@/lib/auth";
-import { unauthorizedResponse, noTallerResponse, validationErrorResponse } from "@/lib/api";
+import { unauthorizedResponse, noTallerResponse, validationErrorResponse, serviceErrorResponse } from "@/lib/api";
 import { db } from "@/lib/db";
 import { normalizeText } from "@/lib/text";
 import { logAudit } from "@/lib/audit";
 import { prismaCode } from "@/lib/api";
 import { round2 } from "@/lib/money";
+import { assertProductsUsable } from "@/lib/stock";
 import { WorkOrderSchema } from "@/lib/validations";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -143,13 +144,17 @@ export async function POST(request: NextRequest) {
       }
       // La orden hereda exactamente los ítems y el total del presupuesto aprobado
       items = quote.items.map((i) => ({
+        productId: i.productId ?? undefined,
         descripcion: i.descripcion,
-        cantidad: i.cantidad,
+        cantidad: Number(i.cantidad),
         precioUnitario: i.precioUnitario,
       }));
     }
 
+    // Los ítems heredados de un presupuesto ya fueron validados al crearlo
+    if (!quoteId) await assertProductsUsable(db, userTaller.tallerId, items.map((i) => i.productId));
     const itemsWithSubtotal = items.map((item) => ({
+      productId: item.productId,
       descripcion: item.descripcion,
       cantidad: item.cantidad,
       precioUnitario: item.precioUnitario,
@@ -209,6 +214,8 @@ tallerId: userTaller.tallerId,
 
     return NextResponse.json(workOrder, { status: 201 });
   } catch (error) {
+    const handled = serviceErrorResponse(error);
+    if (handled) return handled;
     console.error("WorkOrders POST error:", error);
     return NextResponse.json(
       { error: "No se pudo crear el registro. Reintentá en unos segundos." },

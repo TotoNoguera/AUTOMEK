@@ -3,7 +3,19 @@ import { addDays, dayRangeAR, isValidDateString, monthRangeAR, shiftMonth, start
 import { pendingAmount, round2 } from "./money";
 import { normalizeText, phoneDigits } from "./text";
 import { buildWhatsAppLink, normalizePhoneForWhatsApp } from "./whatsapp";
-import { ClientSchema, DailyCloseSchema, GoalSchema, QuoteItemSchema, ScheduleSchema, VehicleSchema, normalizePatente } from "./validations";
+import {
+  ClientSchema,
+  DailyCloseSchema,
+  GoalSchema,
+  QuoteItemSchema,
+  QuoteSchema,
+  ScheduleSchema,
+  ScheduleToWorkOrderSchema,
+  VehicleSchema,
+  WorkOrderItemSchema,
+  WorkOrderSchema,
+  normalizePatente,
+} from "./validations";
 
 describe("fechas en hora argentina", () => {
   it("el día argentino empieza a las 03:00 UTC (sin DST)", () => {
@@ -133,9 +145,38 @@ describe("validaciones de vehículos", () => {
 });
 
 describe("validaciones de importes, fechas y horas", () => {
-  it("cantidad admite decimales positivos (0.5) pero no 0", () => {
-    expect(QuoteItemSchema.safeParse({ descripcion: "Mano de obra", cantidad: 0.5, precioUnitario: 4000 }).success).toBe(true);
-    expect(QuoteItemSchema.safeParse({ descripcion: "x", cantidad: 0, precioUnitario: 1 }).success).toBe(false);
+  it("cantidad: positiva, con hasta 3 decimales (litros, kilos, metros) y tope", () => {
+    const parse = (cantidad: unknown) => QuoteItemSchema.safeParse({ descripcion: "Aceite", cantidad, precioUnitario: 4000 });
+    for (const ok of [1, 2, 0.5, 0.25, 1.5, 2.125, 0.001, 100_000]) expect(parse(ok).success, `cantidad ${ok}`).toBe(true);
+    for (const bad of [0, -1, 0.0001, 1.2345, 100_001, NaN, Infinity, "2", null, undefined]) {
+      expect(parse(bad).success, `cantidad ${String(bad)}`).toBe(false);
+    }
+    const tooPrecise = parse(1.2345);
+    expect(!tooPrecise.success && tooPrecise.error.errors[0].message).toBe("Cantidad admite hasta 3 decimales");
+  });
+
+  it("los ítems pueden llevar un producto opcional (cuid); sin producto siguen funcionando igual", () => {
+    const base = { descripcion: "Aceite", cantidad: 2, precioUnitario: 100 };
+    const cuid = "cmu7a30ld0001i604fl83lkr6";
+    expect(QuoteItemSchema.safeParse(base).success).toBe(true);
+    const withProduct = QuoteItemSchema.safeParse({ ...base, productId: cuid });
+    expect(withProduct.success && withProduct.data.productId).toBe(cuid);
+    const nulo = QuoteItemSchema.safeParse({ ...base, productId: null });
+    expect(nulo.success && nulo.data.productId).toBeUndefined();
+    expect(QuoteItemSchema.safeParse({ ...base, productId: "no-es-cuid" }).success).toBe(false);
+  });
+
+  it("todos los esquemas con ítems comparten la regla de cantidad y producto", () => {
+    const base = { clientId: "cmu7a30ld0001i604fl83lkr6", vehicleId: "cmu7a35ja0005i604os06qpu5" };
+    const fracc = [{ descripcion: "Aceite", cantidad: 0.5, precioUnitario: 4000 }];
+    const mala = [{ descripcion: "Aceite", cantidad: 0.0005, precioUnitario: 4000 }];
+    expect(QuoteSchema.safeParse({ ...base, items: fracc }).success).toBe(true);
+    expect(QuoteSchema.safeParse({ ...base, items: mala }).success).toBe(false);
+    expect(WorkOrderSchema.safeParse({ ...base, motivoIngreso: "Service", items: fracc }).success).toBe(true);
+    expect(WorkOrderSchema.safeParse({ ...base, motivoIngreso: "Service", items: mala }).success).toBe(false);
+    expect(WorkOrderItemSchema.safeParse(mala[0]).success).toBe(false);
+    expect(ScheduleToWorkOrderSchema.safeParse({ motivoIngreso: "Service", items: fracc }).success).toBe(true);
+    expect(ScheduleToWorkOrderSchema.safeParse({ motivoIngreso: "Service", items: mala }).success).toBe(false);
   });
 
   it("precio: máximo 2 decimales y tope", () => {

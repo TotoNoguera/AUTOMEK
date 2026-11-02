@@ -5,12 +5,14 @@ import { useSubmitGuard } from "@/lib/useSubmitGuard";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Printer, Pencil, X, ArrowRightCircle } from "lucide-react";
+import { ArrowLeft, Printer, Pencil, X, ArrowRightCircle, Package } from "lucide-react";
+import { formatQuantity } from "@/lib/units";
 import { useToast } from "@/components/common/ToastProvider";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Input";
+import { ProductLink, type ProductOption } from "@/components/stock/ProductLink";
 import { Badge } from "@/components/ui/Badge";
 import { Table, Thead, Tbody, Tr, Th, Td } from "@/components/ui/Table";
 import { Skeleton } from "@/components/ui/EmptyState";
@@ -18,6 +20,7 @@ import { formatDateAR } from "@/lib/dates";
 
 interface QuoteItem {
   id: string;
+  productId?: string | null;
   descripcion: string;
   cantidad: number;
   precioUnitario: number;
@@ -41,6 +44,9 @@ interface QuoteItemForm {
   descripcion: string;
   cantidad: string;
   precioUnitario: string;
+  /** Producto del inventario vinculado (opcional) */
+  productId?: string;
+  producto?: ProductOption;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -84,6 +90,7 @@ export default function QuoteDetailPage() {
         setObservaciones(data.observaciones || "");
         setItems(
           data.items.map((item: QuoteItem) => ({
+            productId: item.productId ?? undefined,
             descripcion: item.descripcion,
             cantidad: String(item.cantidad),
             precioUnitario: String(item.precioUnitario),
@@ -102,6 +109,18 @@ export default function QuoteDetailPage() {
 
   function addItem() {
     setItems([...items, { descripcion: "", cantidad: "1", precioUnitario: "0" }]);
+  }
+
+  function selectProduct(index: number, product: ProductOption) {
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], productId: product.id, producto: product, descripcion: product.nombre, precioUnitario: String(product.precioVenta) };
+    setItems(newItems);
+  }
+
+  function clearProduct(index: number) {
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], productId: undefined, producto: undefined };
+    setItems(newItems);
   }
 
   function removeItem(index: number) {
@@ -132,6 +151,7 @@ export default function QuoteDetailPage() {
           observaciones: observaciones || undefined,
           items: items.map((item) => ({
             descripcion: item.descripcion,
+            productId: item.productId,
             cantidad: Number(item.cantidad) || 1,
             precioUnitario: Number(item.precioUnitario) || 0,
           })),
@@ -183,6 +203,7 @@ export default function QuoteDetailPage() {
           quoteId: quote.id,
           motivoIngreso: quote.observaciones || "Trabajos según presupuesto",
           items: quote.items.map((item) => ({
+            productId: item.productId ?? undefined,
             descripcion: item.descripcion,
             cantidad: item.cantidad,
             precioUnitario: item.precioUnitario,
@@ -299,7 +320,8 @@ export default function QuoteDetailPage() {
                         <Input
                           type="number"
                           placeholder="Cant."
-                          min="1"
+                          min="0.001"
+                          step="0.001"
                           value={item.cantidad}
                           onChange={(e) => updateItem(index, "cantidad", e.target.value)}
                           className="col-span-2"
@@ -323,6 +345,16 @@ export default function QuoteDetailPage() {
                         >
                           <X className="h-4 w-4" />
                         </button>
+                        <div className="col-span-12">
+                          <ProductLink
+                            productId={item.productId}
+                            product={item.producto}
+                            cantidad={Number(item.cantidad) || 0}
+                            contexto="presupuesto"
+                            onSelect={(p) => selectProduct(index, p)}
+                            onClear={() => clearProduct(index)}
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -353,8 +385,11 @@ export default function QuoteDetailPage() {
                 <Tbody>
                   {quote.items.map((item) => (
                     <Tr key={item.id}>
-                      <Td>{item.descripcion}</Td>
-                      <Td className="text-carbon-400">{item.cantidad}</Td>
+                      <Td>
+                        {item.descripcion}
+                        {item.productId && <span className="ml-2 inline-flex items-center gap-1 align-middle text-[11px] text-brand-400"><Package className="h-3 w-3" /> Inventario</span>}
+                      </Td>
+                      <Td className="text-carbon-400">{formatQuantity(item.cantidad)}</Td>
                       <Td className="text-carbon-400">{formatCurrency(item.precioUnitario)}</Td>
                       <Td className="font-medium">{formatCurrency(item.subtotal)}</Td>
                     </Tr>

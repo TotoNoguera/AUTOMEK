@@ -10,6 +10,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { ProductLink, type ProductOption } from "@/components/stock/ProductLink";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/EmptyState";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -29,6 +30,9 @@ interface WorkOrderItemForm {
   descripcion: string;
   cantidad: string;
   precioUnitario: string;
+  /** Producto del inventario vinculado (opcional) */
+  productId?: string;
+  producto?: ProductOption;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -172,6 +176,18 @@ export default function ScheduleDetailPage() {
     setItems([...items, { descripcion: "", cantidad: "1", precioUnitario: "0" }]);
   }
 
+  function selectProduct(index: number, product: ProductOption) {
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], productId: product.id, producto: product, descripcion: product.nombre, precioUnitario: String(product.precioVenta) };
+    setItems(newItems);
+  }
+
+  function clearProduct(index: number) {
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], productId: undefined, producto: undefined };
+    setItems(newItems);
+  }
+
   function removeItem(index: number) {
     setItems(items.filter((_, i) => i !== index));
   }
@@ -194,6 +210,7 @@ export default function ScheduleDetailPage() {
           motivoIngreso,
           items: items.map((item) => ({
             descripcion: item.descripcion,
+            productId: item.productId,
             cantidad: Number(item.cantidad) || 1,
             precioUnitario: Number(item.precioUnitario) || 0,
           })),
@@ -333,7 +350,8 @@ export default function ScheduleDetailPage() {
                         <Input
                           type="number"
                           placeholder="Cant."
-                          min="1"
+                          min="0.001"
+                          step="0.001"
                           value={item.cantidad}
                           onChange={(e) => updateItem(index, "cantidad", e.target.value)}
                           className="col-span-2"
@@ -357,6 +375,16 @@ export default function ScheduleDetailPage() {
                         >
                           <X className="h-4 w-4" />
                         </button>
+                        <div className="col-span-12">
+                          <ProductLink
+                            productId={item.productId}
+                            product={item.producto}
+                            cantidad={Number(item.cantidad) || 0}
+                            contexto="orden"
+                            onSelect={(p) => selectProduct(index, p)}
+                            onClear={() => clearProduct(index)}
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>

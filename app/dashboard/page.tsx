@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/common/StatCard";
 import { formatCurrency } from "@/lib/utils";
+import { formatQuantity } from "@/lib/units";
 import { formatTodayLongAR, todayAR } from "@/lib/dates";
 import { buildWhatsAppLink, whatsAppConfirmTurno, whatsAppVehiculoListo, whatsAppRecordatorioPago } from "@/lib/whatsapp";
 
@@ -48,6 +49,7 @@ interface StatsData {
   vehiculosFrecuentes: Array<{ patente: string; marca: string; modelo: string; count: number }>;
   objetivosMes: Array<{ tipo: string; objetivo: number; alcanzado: number; estado: string }>;
   monthlyData: Array<{ mes: number; anio: number; ingresos: number; egresos: number; ordenes: number }>;
+  stockBajo?: { total: number; productos: Array<{ id: string; nombre: string; unidad: string; stockActual: number; stockMinimo: number }> };
 }
 
 interface ScheduleItem {
@@ -270,6 +272,13 @@ function DashboardContent() {
       tone: "warning",
       text: `${formatCurrency(stats.deudasPendientes)} en deudas pendientes de cobro.`,
       href: "/debts",
+    });
+  }
+  if (stats?.stockBajo && stats.stockBajo.total > 0) {
+    alerts.push({
+      tone: "warning",
+      text: `${stats.stockBajo.total} producto${stats.stockBajo.total > 1 ? "s" : ""} con stock bajo.`,
+      href: "/products?bajoStock=1",
     });
   }
   if (listosParaEntregar.length > 0) {
@@ -607,6 +616,35 @@ function DashboardContent() {
                 <p className={`text-2xl font-bold ${stats!.deudasPendientes > 0 ? "text-amber-400" : "text-emerald-400"}`}>
                   {formatCurrency(stats!.deudasPendientes)}
                 </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Stock bajo */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Stock Bajo</CardTitle>
+              <Link href="/products?bajoStock=1" className="text-xs text-brand-400 hover:underline">Ver productos</Link>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <Skeleton className="h-16 w-full" />
+              ) : !stats!.stockBajo || stats!.stockBajo.total === 0 ? (
+                <p className="text-sm text-emerald-400">Todos los productos tienen stock suficiente.</p>
+              ) : (
+                <>
+                  <p className="mb-2 text-2xl font-bold text-amber-400">{stats!.stockBajo.total}</p>
+                  <ul className="space-y-1.5">
+                    {stats!.stockBajo.productos.map((p) => (
+                      <li key={p.id} className="flex items-center justify-between gap-2 text-sm">
+                        <Link href={`/products/${p.id}`} className="truncate text-carbon-100 hover:text-brand-300">{p.nombre}</Link>
+                        <span className={`shrink-0 text-xs ${p.stockActual <= 0 ? "text-red-400" : "text-amber-400"}`}>
+                          {formatQuantity(p.stockActual, p.unidad)} / mín. {formatQuantity(p.stockMinimo)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
               )}
             </CardContent>
           </Card>

@@ -1,8 +1,9 @@
 import { auth } from "@/lib/auth";
-import { unauthorizedResponse, noTallerResponse, validationErrorResponse } from "@/lib/api";
+import { unauthorizedResponse, noTallerResponse, validationErrorResponse, serviceErrorResponse } from "@/lib/api";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { round2 } from "@/lib/money";
+import { assertProductsUsable } from "@/lib/stock";
 import { ScheduleToWorkOrderSchema } from "@/lib/validations";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -52,7 +53,9 @@ export async function POST(
     const { motivoIngreso, diagnostico, observaciones, kmIngreso, items } =
       validation.data;
 
+    await assertProductsUsable(db, userTaller.tallerId, items.map((i) => i.productId));
     const itemsWithSubtotal = items.map((item) => ({
+      productId: item.productId,
       descripcion: item.descripcion,
       cantidad: item.cantidad,
       precioUnitario: item.precioUnitario,
@@ -116,6 +119,8 @@ tallerId: userTaller.tallerId,
 
     return NextResponse.json(workOrder, { status: 201 });
   } catch (error) {
+    const handled = serviceErrorResponse(error);
+    if (handled) return handled;
     console.error("Schedule to-work-order error:", error);
     return NextResponse.json(
       { error: "No se pudo convertir el turno en orden de trabajo. Reintentá en unos segundos." },
