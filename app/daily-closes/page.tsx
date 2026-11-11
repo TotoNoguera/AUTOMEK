@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Printer, Lock, History } from "lucide-react";
 import { useToast } from "@/components/common/ToastProvider";
 import { AppShell } from "@/components/layout/AppShell";
+import { PrintTallerLogo } from "@/components/common/TallerLogo";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -111,6 +112,7 @@ export default function DailyClosesPage() {
 
   return (
     <AppShell>
+      <PrintTallerLogo />
       <PageHeader
         className="no-print"
         title="Cierre de Caja Diaria"

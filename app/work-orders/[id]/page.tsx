@@ -8,6 +8,7 @@ import { ArrowLeft, Printer, Pencil, Trash2, Plus, MessageCircle, Package } from
 import { ProductLink, type ProductOption } from "@/components/stock/ProductLink";
 import { OrderStockCard } from "@/components/stock/OrderStockCard";
 import { formatQuantity } from "@/lib/units";
+import { TallerLogo } from "@/components/common/TallerLogo";
 import { useToast } from "@/components/common/ToastProvider";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -54,6 +55,7 @@ interface WorkOrder {
   items: WorkOrderItem[];
   payments?: Payment[];
   margen?: number;
+  taller?: { nombre: string; logo?: string | null };
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -273,6 +275,7 @@ export default function WorkOrderDetailPage() {
             <CardContent>
               <div className="mb-4 flex items-start justify-between">
                 <div>
+                  {workOrder.taller && <TallerLogo nombre={workOrder.taller.nombre} logo={workOrder.taller.logo} className="mb-2" />}
                   <h1 className="text-xl font-bold text-white">Orden #{workOrder.id.slice(-6)}</h1>
                   <p className="text-sm text-carbon-400">{formatDateAR(workOrder.fecha)}</p>
                 </div>

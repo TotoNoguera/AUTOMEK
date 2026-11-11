@@ -31,7 +31,10 @@
     "qa:verify:migrations": "node scripts/qa/run-qa.mjs -- node scripts/qa/verify-migrations.mjs",
     "qa:fingerprint": "node scripts/qa/run-qa.mjs -- node scripts/qa/fingerprint.mjs",
     "qa:lock-probe": "node scripts/qa/run-qa.mjs -- node scripts/qa/lock-probe.mjs",
-    "qa:serve-head": "node scripts/qa/run-qa.mjs -- node scripts/qa/serve-head.mjs"
+    "qa:serve-head": "node scripts/qa/run-qa.mjs -- node scripts/qa/serve-head.mjs",
+    "qa:e2e:accounts": "node scripts/qa/run-qa.mjs -- node scripts/qa/e2e-accounts.mjs",
+    "accounts:provision": "node scripts/accounts/provision.mjs",
+    "accounts:seed-demo": "node scripts/accounts/seed-demo.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",

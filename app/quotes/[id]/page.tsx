@@ -7,6 +7,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Printer, Pencil, X, ArrowRightCircle, Package } from "lucide-react";
 import { formatQuantity } from "@/lib/units";
+import { TallerLogo } from "@/components/common/TallerLogo";
+import { safeLogoSrc } from "@/lib/useTaller";
 import { useToast } from "@/components/common/ToastProvider";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -37,7 +39,7 @@ interface Quote {
   vehicle: { id: string; patente: string; marca: string; modelo: string };
   items: QuoteItem[];
   workOrder?: { id: string } | null;
-  taller: { nombre: string };
+  taller: { nombre: string; logo?: string | null };
 }
 
 interface QuoteItemForm {
@@ -244,7 +246,11 @@ export default function QuoteDetailPage() {
             <CardContent>
               <div className="mb-4 flex items-start justify-between">
                 <div>
-                  <p className="text-2xl font-extrabold tracking-wide text-white">{quote.taller.nombre.toUpperCase()}</p>
+                  {safeLogoSrc(quote.taller.logo) ? (
+                    <TallerLogo nombre={quote.taller.nombre} logo={quote.taller.logo} className="mb-2" />
+                  ) : (
+                    <p className="text-2xl font-extrabold tracking-wide text-white">{quote.taller.nombre.toUpperCase()}</p>
+                  )}
                   <h1 className="text-xl font-bold text-white">Presupuesto #{quote.id.slice(-6)}</h1>
                   <p className="text-sm text-carbon-400">{formatDateAR(quote.fecha)}</p>
                 </div>

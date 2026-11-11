@@ -6,6 +6,7 @@ import Link from "next/link";
 import { formatDateAR, yearMonthAR } from "@/lib/dates";
 import { Printer } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
+import { PrintTallerLogo } from "@/components/common/TallerLogo";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -67,6 +68,7 @@ export default function MonthlyReportPage() {
 
   return (
     <AppShell>
+      <PrintTallerLogo />
       <PageHeader
         className="no-print"
         title="Resumen Mensual"

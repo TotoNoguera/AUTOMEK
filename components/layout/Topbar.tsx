@@ -5,10 +5,13 @@ import { signOut } from "next-auth/react";
 import { LogOut, Menu } from "lucide-react";
 import { MobileSidebar } from "./Sidebar";
 import { GlobalSearch } from "@/components/common/GlobalSearch";
+import { TallerLogo } from "@/components/common/TallerLogo";
+import { safeLogoSrc, useTaller } from "@/lib/useTaller";
 
 export function Topbar({ userName, tallerName }: { userName?: string; tallerName?: string }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const taller = useTaller();
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -29,7 +32,14 @@ export function Topbar({ userName, tallerName }: { userName?: string; tallerName
             <Menu className="h-5 w-5" />
           </button>
           <div className="hidden sm:block">
-            <p className="text-sm font-semibold text-white">{tallerName || "Tu Taller"}</p>
+            {taller && safeLogoSrc(taller.logo) ? (
+              <div className="flex items-center gap-2">
+                <TallerLogo nombre={taller.nombre} logo={taller.logo} className="h-9 max-w-[120px]" />
+                <p className="text-sm font-semibold text-white">{taller.nombre}</p>
+              </div>
+            ) : (
+              <p className="text-sm font-semibold text-white">{tallerName || "Tu Taller"}</p>
+            )}
           </div>
         </div>
 

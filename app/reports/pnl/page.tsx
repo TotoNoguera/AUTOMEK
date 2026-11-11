@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Download, Printer } from "lucide-react";
 import { downloadCsv } from "@/lib/csv";
 import { AppShell } from "@/components/layout/AppShell";
+import { PrintTallerLogo } from "@/components/common/TallerLogo";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -71,6 +72,7 @@ export default function PnlReportPage() {
 
   return (
     <AppShell>
+      <PrintTallerLogo />
       <PageHeader
         className="no-print"
         title="Costos vs Ingresos (P&L)"

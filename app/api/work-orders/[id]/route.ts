@@ -27,7 +27,7 @@ export async function GET(
 
     const workOrder = await db.workOrder.findUnique({
       where: { id },
-      include: { client: true, vehicle: true, items: true, payments: { include: { method: true }, orderBy: { fecha: "asc" } } },
+      include: { client: true, vehicle: true, items: true, payments: { include: { method: true }, orderBy: { fecha: "asc" } }, taller: { select: { nombre: true, logo: true } } },
     });
 
     if (!workOrder || workOrder.tallerId !== userTaller.tallerId) {
