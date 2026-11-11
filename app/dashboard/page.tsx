@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState, Skeleton } from "@/components/ui/EmptyState";
 import { StatCard } from "@/components/common/StatCard";
 import { formatCurrency } from "@/lib/utils";
+import { greetingFor } from "@/lib/greeting";
 import { formatQuantity } from "@/lib/units";
 import { formatTodayLongAR, todayAR } from "@/lib/dates";
 import { buildWhatsAppLink, whatsAppConfirmTurno, whatsAppVehiculoListo, whatsAppRecordatorioPago } from "@/lib/whatsapp";
@@ -298,7 +299,7 @@ function DashboardContent() {
       <div className="mb-6">
         <p className="text-xs font-medium uppercase tracking-wide text-brand-400">Centro de Control</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">
-          Hola, {session?.user?.name?.split(" ")[0] || "bienvenido"} 👋
+          {greetingFor(session?.user?.name)}
         </h1>
         <p className="mt-1 text-sm text-carbon-400">
           {todayLabel ? `Este es tu día, ${todayLabel}.` : " "}

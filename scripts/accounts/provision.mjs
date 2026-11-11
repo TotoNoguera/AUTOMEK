@@ -6,6 +6,8 @@
 // Sin --apply solo muestra qué haría (no escribe). Reglas:
 //  - Si el email ya existe NO se crea nada nuevo ni se cambia su contraseña (salvo --reset-password).
 //  - Un usuario queda vinculado a UN solo taller (la app resuelve el taller con el primer vínculo del usuario).
+//  - ACCOUNT_NAME es el nombre de la PERSONA (se usa en el saludo y en la barra); es obligatorio al crear y nunca se toma del nombre del taller.
+//  - --update-name cambia el nombre de la persona de un usuario existente (ACCOUNT_NAME).
 //  - --update-taller actualiza nombre / logo / contacto del taller de ese usuario (TALLER_NOMBRE, TALLER_LOGO...).
 //  - Nunca toca talleres protegidos (MT Mecánica) ni usuarios sin exactamente un taller.
 //  - La contraseña llega por variable de entorno, se guarda solo como hash bcrypt y no se imprime ni se registra.
@@ -14,6 +16,7 @@ import { connect, hashPassword, isEmail, isProtectedTaller, normalizeEmail } fro
 const apply = process.argv.includes("--apply");
 const updateTaller = process.argv.includes("--update-taller");
 const resetPassword = process.argv.includes("--reset-password");
+const updateName = process.argv.includes("--update-name");
 const email = normalizeEmail(process.env.ACCOUNT_EMAIL);
 const password = process.env.ACCOUNT_PASSWORD;
 const tallerNombre = process.env.TALLER_NOMBRE?.trim();
@@ -34,7 +37,7 @@ try {
     if (existing.userTallers.length !== 1) throw new Error(`El usuario tiene ${existing.userTallers.length} talleres vinculados; se esperaba exactamente 1. Detenido.`);
     const taller = existing.userTallers[0].taller;
     console.log(`[accounts] taller vinculado: "${taller.nombre}" (id ${taller.id})`);
-    if (isProtectedTaller(taller.nombre) && (updateTaller || resetPassword)) throw new Error("Taller protegido: este script no lo modifica.");
+    if (isProtectedTaller(taller.nombre) && (updateTaller || resetPassword || updateName)) throw new Error("Taller protegido: este script no lo modifica.");
 
     if (updateTaller) {
       const data = {};
@@ -48,6 +51,14 @@ try {
         console.log("[accounts] taller actualizado.");
       }
     }
+    if (updateName) {
+      if (!userName) throw new Error("--update-name requiere ACCOUNT_NAME.");
+      console.log(`[accounts] nombre de la persona: "${existing.name}" -> "${userName}"`);
+      if (apply && existing.name !== userName) {
+        await db.user.update({ where: { id: existing.id }, data: { name: userName } });
+        console.log("[accounts] nombre actualizado.");
+      }
+    }
     if (resetPassword) {
       if (!password) throw new Error("--reset-password requiere ACCOUNT_PASSWORD.");
       console.log("[accounts] se reemplazará la contraseña (solo el hash).");
@@ -59,6 +70,7 @@ try {
   } else {
     if (!password || password.length < 8) throw new Error("ACCOUNT_PASSWORD ausente o demasiado corta (mínimo 8 caracteres).");
     if (!tallerNombre) throw new Error("TALLER_NOMBRE es requerido para crear un taller nuevo.");
+    if (!userName) throw new Error("ACCOUNT_NAME (nombre de la persona, p. ej. María) es requerido para crear un usuario nuevo.");
     if (isProtectedTaller(tallerNombre)) throw new Error("Ese nombre de taller está reservado.");
     const sameName = await db.taller.count({ where: { nombre: tallerNombre } });
     if (sameName > 0) throw new Error(`Ya existe un taller llamado "${tallerNombre}": se detiene para no duplicar. Usá otro nombre o creá el usuario sobre ese taller manualmente.`);
@@ -67,7 +79,7 @@ try {
       const hash = await hashPassword(db, password);
       const created = await db.$transaction(async (tx) => {
         const taller = await tx.taller.create({ data: { nombre: tallerNombre, logo: process.env.TALLER_LOGO || null, telefono: process.env.TALLER_TELEFONO || null, direccion: process.env.TALLER_DIRECCION || null } });
-        const user = await tx.user.create({ data: { email, name: userName || tallerNombre, password: hash } });
+        const user = await tx.user.create({ data: { email, name: userName, password: hash } });
         await tx.userTaller.create({ data: { userId: user.id, tallerId: taller.id, role: "admin" } });
         return { taller, user };
       });
